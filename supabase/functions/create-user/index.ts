@@ -2,6 +2,9 @@
 // l'administrateur. La clé secrète (SERVICE_ROLE) reste ici, côté
 // serveur, et n'est jamais envoyée au navigateur.
 import { createClient } from 'npm:@supabase/supabase-js@2';
+import nodemailer from 'npm:nodemailer@^9';
+
+declare const EdgeRuntime: { waitUntil: (promise: Promise<unknown>) => void };
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,10 +14,199 @@ const corsHeaders = {
 // Adresse de l'application, utilisée pour construire le lien d'activation
 // envoyé (ou généré) lors d'une invitation. Peut être surchargée par la
 // variable d'environnement SITE_URL si le nom de domaine change un jour.
-const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://fwizzi.github.io/qcm-arbitres';
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://omnelya.github.io/qcm-arbitres';
 
 const ROLES_VALIDES = ['admin', 'formateur', 'arbitre'];
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Délai entre deux envois d'un même lot d'invitations. On n'envoie plus les
+// e-mails via le mailer intégré de Supabase Auth (inviteUserByEmail), qui
+// est plafonné à 30/heure même avec le SMTP Gmail personnalisé : on génère
+// le lien d'activation (generateLink, qui ne crée le lien SANS envoyer de
+// mail) puis on envoie nous-mêmes le mail en direct par SMTP, exactement
+// comme notify-quiz-published — ce qui permet ce rythme de 2s, prouvé en
+// production avec 60 destinataires pour cette autre fonction.
+const DELAI_ENTRE_ENVOIS_MS = 2000;
+
+function creerTransportSmtp() {
+  return nodemailer.createTransport({
+    host: Deno.env.get('SMTP_HOSTNAME')!,
+    port: Number(Deno.env.get('SMTP_PORT')!),
+    secure: false,
+    auth: {
+      user: Deno.env.get('SMTP_USERNAME')!,
+      pass: Deno.env.get('SMTP_PASSWORD')!,
+    },
+  });
+}
+
+// Même habillage visuel que supabase/email-templates/invite-user.html
+// (motif "Ballon en main"), mais avec le lien d'activation en dur : on ne
+// passe plus par le système de templates Go de Supabase Auth.
+function construireEmailInvitationHtml(prenom: string, lienActivation: string): string {
+  return `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Invitation QCM Arbitres</title>
+</head>
+<body style="margin:0;padding:0;background:#F7F7F5;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F7F5;padding:32px 16px;font-family:Inter,-apple-system,'Segoe UI',Arial,sans-serif;">
+    <tr><td align="center">
+      <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFFFF;">
+
+        <tr><td style="background:#E6F0EA;padding:20px 0;text-align:center;">
+          <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Ballon de handball">
+            <g stroke="#164F35" stroke-width="2" opacity="0.45" stroke-linecap="round">
+              <line x1="4" y1="20" x2="13" y2="23"/>
+              <line x1="2" y1="28" x2="12" y2="29"/>
+              <line x1="4" y1="36" x2="13" y2="34"/>
+            </g>
+            <circle cx="35" cy="29" r="18" fill="#164F35"/>
+            <path d="M21,19 Q35,12 49,19" fill="none" stroke="#E6F0EA" stroke-width="2" opacity="0.7"/>
+            <path d="M23,39 Q35,45 47,39" fill="none" stroke="#0E2A1C" stroke-width="2" opacity="0.5"/>
+          </svg>
+        </td></tr>
+
+        <tr><td style="padding:30px 40px 6px;text-align:center;">
+          <p style="margin:0 0 6px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#C99A2E;font-weight:700;font-family:Inter,Arial,sans-serif;">Ballon en main</p>
+          <h1 style="margin:0 0 14px;font-size:21px;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">Bienvenue, ${prenom}</h1>
+        </td></tr>
+
+        <tr><td style="padding:0 40px 30px;text-align:center;">
+          <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">Un compte a été créé pour toi sur la plateforme QCM Arbitres. Clique sur le bouton ci-dessous pour définir ton mot de passe et activer ton compte.</p>
+          <a href="${lienActivation}" style="display:inline-block;background:#C99A2E;color:#1A1D1B;text-decoration:none;font-size:15px;font-weight:700;padding:12px 32px;border-radius:24px;font-family:Inter,Arial,sans-serif;">Activer mon compte</a>
+        </td></tr>
+
+        <tr><td style="padding:18px 40px;border-top:1px solid #E3E1DB;text-align:center;">
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#6B6B64;font-family:Inter,Arial,sans-serif;">Ce lien est valable une seule fois. Si tu n'es pas à l'origine de cette demande, tu peux ignorer cet e-mail.</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+// Traite UNE ligne de la file : génère son lien d'activation (sans mail
+// natif Supabase) puis envoie nous-mêmes le mail par SMTP. Utilisée à la
+// fois par le lot immédiat ci-dessous et par send-queued-invites (filet de
+// sécurité), pour un comportement identique dans les deux cas.
+async function genererLienEtEnvoyer(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  transport: ReturnType<typeof nodemailer.createTransport>,
+  ligne: { id: string; full_name: string; email: string; roles: string[] }
+): Promise<{ ok: boolean; erreur: string | null }> {
+  const { data: claimed } = await supabaseAdmin
+    .from('invite_queue')
+    .update({ status: 'en_cours' })
+    .eq('id', ligne.id)
+    .eq('status', 'en_attente')
+    .select()
+    .maybeSingle();
+
+  if (!claimed) {
+    return { ok: false, erreur: null };
+  }
+
+  const { data: linkData, error: linkErr } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'invite',
+    email: ligne.email,
+    options: { data: { full_name: ligne.full_name }, redirectTo: `${SITE_URL}/activer-mon-compte` },
+  });
+
+  if (linkErr || !linkData?.user || !linkData.properties?.action_link) {
+    const message = linkErr?.message ?? 'Échec de la génération du lien.';
+    await supabaseAdmin.from('invite_queue').update({ status: 'echec', erreur: message }).eq('id', ligne.id);
+    return { ok: false, erreur: message };
+  }
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      transport.sendMail(
+        {
+          from: `"QCM Arbitres" <${Deno.env.get('SMTP_USERNAME')}>`,
+          to: ligne.email,
+          subject: 'Bienvenue sur QCM Arbitres',
+          html: construireEmailInvitationHtml(ligne.full_name, linkData.properties!.action_link),
+        },
+        (error: Error | null) => (error ? reject(error) : resolve())
+      );
+    });
+  } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
+    await supabaseAdmin.from('invite_queue').update({ status: 'echec', erreur: message }).eq('id', ligne.id);
+    return { ok: false, erreur: message };
+  }
+
+  const { error: rolesErr } = await supabaseAdmin
+    .from('user_roles')
+    .insert(ligne.roles.map((role) => ({ user_id: linkData.user!.id, role })));
+
+  await supabaseAdmin
+    .from('invite_queue')
+    .update({
+      status: 'envoye',
+      sent_at: new Date().toISOString(),
+      user_id: linkData.user!.id,
+      erreur: rolesErr
+        ? "Compte créé et e-mail envoyé, mais les rôles n'ont pas pu être attribués : attribue-les manuellement dans Comptes."
+        : null,
+    })
+    .eq('id', ligne.id);
+
+  return { ok: true, erreur: null };
+}
+
+// Envoie tout un lot en tâche de fond, espacé de DELAI_ENTRE_ENVOIS_MS,
+// pendant que la réponse HTTP est déjà repartie côté admin (voir
+// EdgeRuntime.waitUntil dans l'action "queue-invite" ci-dessous). Note :
+// une fonction Supabase a une durée de vie maximale (150s en plan gratuit,
+// 400s en payant) partagée avec ses tâches de fond ; au-delà, les derniers
+// destinataires d'un très gros lot ne seraient pas traités ici — mais
+// restent en 'en_attente' et seront repris par send-queued-invites
+// (toutes les 2 minutes), qui sert justement de filet de sécurité pour ce
+// cas.
+async function envoyerLotEnArrierePlan(
+  supabaseAdmin: ReturnType<typeof createClient>,
+  lignes: { id: string; full_name: string; email: string; roles: string[] }[]
+) {
+  const transport = creerTransportSmtp();
+  for (const ligne of lignes) {
+    await genererLienEtEnvoyer(supabaseAdmin, transport, ligne);
+    await new Promise((r) => setTimeout(r, DELAI_ENTRE_ENVOIS_MS));
+  }
+}
+
+// Envoi ponctuel d'un seul lien (bouton "Renvoyer le lien par e-mail" dans
+// Comptes.tsx) : contrairement au lot ci-dessus, l'admin attend la
+// confirmation, donc on envoie directement (pas de tâche de fond).
+// Retourne un message d'erreur si l'envoi échoue, sinon null.
+async function envoyerLienParEmail(
+  email: string,
+  full_name: string,
+  lienActivation: string
+): Promise<string | null> {
+  try {
+    const transport = creerTransportSmtp();
+    await new Promise<void>((resolve, reject) => {
+      transport.sendMail(
+        {
+          from: `"QCM Arbitres" <${Deno.env.get('SMTP_USERNAME')}>`,
+          to: email,
+          subject: 'Bienvenue sur QCM Arbitres',
+          html: construireEmailInvitationHtml(full_name, lienActivation),
+        },
+        (error: Error | null) => (error ? reject(error) : resolve())
+      );
+    });
+    return null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+}
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {
@@ -29,68 +221,6 @@ function rolesValides(roles: unknown): roles is string[] {
     roles.length > 0 &&
     roles.every((r) => typeof r === 'string' && ROLES_VALIDES.includes(r))
   );
-}
-
-// Envoie immédiatement une invitation qui vient d'être insérée dans
-// invite_queue (utilisé quand la file était vide : pas de raison de faire
-// attendre jusqu'à 30 minutes le tout premier envoi). Reprend exactement
-// la même logique que send-queued-invites (réservation puis envoi), pour
-// qu'une ligne traitée ici finisse dans le même état qu'une ligne traitée
-// plus tard par la tâche planifiée.
-async function envoyerInvitationMaintenant(
-  supabaseAdmin: ReturnType<typeof createClient>,
-  ligne: { id: string; full_name: string; email: string; roles: string[] }
-): Promise<{ ok: boolean; erreur: string | null; transitoire: boolean }> {
-  const { data: claimed } = await supabaseAdmin
-    .from('invite_queue')
-    .update({ status: 'en_cours' })
-    .eq('id', ligne.id)
-    .eq('status', 'en_attente')
-    .select()
-    .maybeSingle();
-
-  if (!claimed) {
-    return { ok: false, erreur: null, transitoire: false };
-  }
-
-  const { data: created, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(
-    ligne.email,
-    { data: { full_name: ligne.full_name }, redirectTo: `${SITE_URL}/activer-mon-compte` }
-  );
-
-  if (inviteErr || !created?.user) {
-    const message = inviteErr?.message ?? 'Échec inconnu.';
-    // Un dépassement de quota est temporaire : on relâche la ligne (retour
-    // à 'en_attente') pour que la tâche planifiée la reprenne
-    // automatiquement dès qu'un créneau d'envoi redevient disponible,
-    // plutôt que de la laisser bloquée sans suite sur 'echec'.
-    const estQuotaDepasse = message.toLowerCase().includes('rate limit');
-    await supabaseAdmin
-      .from('invite_queue')
-      .update(
-        estQuotaDepasse ? { status: 'en_attente', erreur: null } : { status: 'echec', erreur: message }
-      )
-      .eq('id', ligne.id);
-    return { ok: false, erreur: message, transitoire: estQuotaDepasse };
-  }
-
-  const { error: rolesErr } = await supabaseAdmin
-    .from('user_roles')
-    .insert(ligne.roles.map((role) => ({ user_id: created.user!.id, role })));
-
-  await supabaseAdmin
-    .from('invite_queue')
-    .update({
-      status: 'envoye',
-      sent_at: new Date().toISOString(),
-      user_id: created.user.id,
-      erreur: rolesErr
-        ? "Compte créé et e-mail envoyé, mais les rôles n'ont pas pu être attribués : attribue-les manuellement dans Comptes."
-        : null,
-    })
-    .eq('id', ligne.id);
-
-  return { ok: true, erreur: null, transitoire: false };
 }
 
 Deno.serve(async (req: Request) => {
@@ -142,8 +272,27 @@ Deno.serve(async (req: Request) => {
       if (!userId || !password) {
         return json({ error: 'Identifiant et mot de passe requis.' }, 400);
       }
-      if (password.length < 8) {
-        return json({ error: 'Le mot de passe doit faire au moins 8 caractères.' }, 400);
+      // Même politique que côté frontend (src/lib/motDePasse.ts), dupliquée
+      // ici volontairement (fonctions autonomes) : cette action passe par
+      // la clé service-role (auth.admin.updateUserById), qui contourne le
+      // réglage "Password Requirements" du tableau de bord Supabase — donc
+      // sans cette vérification explicite, un mot de passe faible pourrait
+      // être défini par ce chemin même si le réglage du dashboard est actif.
+      const caracteresSpeciaux = /[!@#$%^&*()_+=[\]{};':"|<>?,./`~-]/;
+      const reglesOk =
+        password.length >= 8 &&
+        /\p{Lu}/u.test(password) &&
+        /\p{Ll}/u.test(password) &&
+        /\p{N}/u.test(password) &&
+        caracteresSpeciaux.test(password);
+      if (!reglesOk) {
+        return json(
+          {
+            error:
+              'Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial.',
+          },
+          400
+        );
       }
 
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password });
@@ -262,41 +411,22 @@ Deno.serve(async (req: Request) => {
         return json({ error: "La mise en file d'attente a échoué. Réessaie dans un instant." }, 400);
       }
 
-      // Si personne n'attendait déjà dans la file, on envoie tout de suite
-      // le tout premier e-mail de ce lot plutôt que de faire patienter
-      // jusqu'à 30 minutes (cas le plus courant : ajout d'une seule
-      // personne à la fois). S'il y en a d'autres dans ce même lot (import
-      // en masse), elles restent en file, traitées comme d'habitude par
-      // la tâche planifiée.
-      let envoyeImmediatement = false;
-      let echecImmediat: string | null = null;
-      if (emailsEnAttente.size === 0) {
-        const premiere = inserted.find((l) => l.email === aInserer[0].email);
-        if (premiere) {
-          const resultat = await envoyerInvitationMaintenant(
-            supabaseAdmin,
-            premiere as { id: string; full_name: string; email: string; roles: string[] }
-          );
-          envoyeImmediatement = resultat.ok;
-          // Un échec transitoire (quota) remet la ligne en file d'attente
-          // normale (voir envoyerInvitationMaintenant) : ce n'est pas un
-          // échec à signaler, juste une invitation qui sera reprise
-          // automatiquement au prochain passage de la tâche planifiée.
-          if (!resultat.ok && resultat.erreur && !resultat.transitoire) {
-            echecImmediat = resultat.erreur;
-          }
-        }
-      }
+      // Envoi de tout le lot en tâche de fond, espacé de 2s (voir
+      // envoyerLotEnArrierePlan) : la réponse HTTP part tout de suite,
+      // l'admin n'attend pas. Les lignes déjà présentes en file avant cet
+      // import (emailsEnAttente) sont ignorées ici : elles seront reprises
+      // par send-queued-invites, le filet de sécurité.
+      EdgeRuntime.waitUntil(
+        envoyerLotEnArrierePlan(
+          supabaseAdmin,
+          inserted as { id: string; full_name: string; email: string; roles: string[] }[]
+        )
+      );
 
-      const dejaTraite = (envoyeImmediatement ? 1 : 0) + (echecImmediat ? 1 : 0);
-      const nombreRestantEnFile = aInserer.length - dejaTraite;
-      const dernierEnvoiEstime =
-        nombreRestantEnFile > 0
-          ? new Date(Date.now() + (emailsEnAttente.size + nombreRestantEnFile) * 30 * 60_000).toISOString()
-          : null;
+      const dureeEstimeeSecondes = aInserer.length * (DELAI_ENTRE_ENVOIS_MS / 1000);
 
       return json(
-        { queued: aInserer.length, erreurs: erreursLignes, envoyeImmediatement, echecImmediat, dernierEnvoiEstime },
+        { queued: aInserer.length, erreurs: erreursLignes, envoiEnCours: true, dureeEstimeeSecondes },
         200
       );
     }
@@ -305,6 +435,12 @@ Deno.serve(async (req: Request) => {
       const full_name = typeof body.full_name === 'string' ? body.full_name.trim() : '';
       const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
       const roles = body.roles;
+      // Si true, le lien généré est aussi envoyé directement par e-mail
+      // (bouton "Renvoyer le lien par e-mail" dans Comptes.tsx) — sinon on
+      // se contente de le renvoyer pour que l'admin le copie lui-même
+      // (bouton "Générer un nouveau lien d'activation", comportement
+      // inchangé).
+      const envoyerParEmail = body.envoyerParEmail === true;
 
       if (!full_name || !email || !EMAIL_REGEX.test(email)) {
         return json({ error: 'Nom complet et e-mail valides requis.' }, 400);
@@ -336,6 +472,21 @@ Deno.serve(async (req: Request) => {
         if (erreurRenvoi || !linkRenvoi?.properties?.action_link) {
           return json({ error: erreurRenvoi?.message ?? 'Échec de la génération du lien.' }, 400);
         }
+
+        if (envoyerParEmail) {
+          const erreurEnvoi = await envoyerLienParEmail(email, full_name, linkRenvoi.properties.action_link);
+          return json(
+            {
+              id: profilExistant.id,
+              link: linkRenvoi.properties.action_link,
+              renvoi: true,
+              envoye: !erreurEnvoi,
+              erreurEnvoi,
+            },
+            200
+          );
+        }
+
         return json(
           { id: profilExistant.id, link: linkRenvoi.properties.action_link, renvoi: true },
           200
@@ -361,6 +512,20 @@ Deno.serve(async (req: Request) => {
 
       if (rolesErr) {
         return json({ error: 'Compte créé mais les rôles n\'ont pas pu être attribués. Attribue-les manuellement.' }, 200);
+      }
+
+      if (envoyerParEmail && linkData.properties?.action_link) {
+        const erreurEnvoi = await envoyerLienParEmail(email, full_name, linkData.properties.action_link);
+        return json(
+          {
+            id: linkData.user.id,
+            link: linkData.properties.action_link,
+            renvoi: false,
+            envoye: !erreurEnvoi,
+            erreurEnvoi,
+          },
+          200
+        );
       }
 
       return json({ id: linkData.user.id, link: linkData.properties?.action_link, renvoi: false }, 200);
