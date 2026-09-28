@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { useAuth } from '../hooks/useAuth';
 import { estLienDeReinitialisation } from '../lib/lienAuth';
+import { motDePasseValide, MESSAGE_REGLES_MOT_DE_PASSE } from '../lib/motDePasse';
+import ReglesMotDePasse from '../components/ReglesMotDePasse';
 
 // Page atteinte via un lien Supabase (activation d'un nouveau compte, ou
 // réinitialisation d'un mot de passe oublié). Le clic sur ce lien établit
@@ -21,8 +23,8 @@ export default function ActiverCompte() {
     e.preventDefault();
     setErreur(null);
 
-    if (motDePasse.length < 8) {
-      setErreur('Le mot de passe doit faire au moins 8 caractères.');
+    if (!motDePasseValide(motDePasse)) {
+      setErreur(MESSAGE_REGLES_MOT_DE_PASSE);
       return;
     }
     if (motDePasse !== confirmation) {
@@ -104,9 +106,9 @@ export default function ActiverCompte() {
             minLength={8}
             value={confirmation}
             onChange={(e) => setConfirmation(e.target.value)}
-            className="w-full border border-border rounded px-3 py-2 mb-1"
+            className="w-full border border-border rounded px-3 py-2 mb-2"
           />
-          <p className="text-xs text-muted mb-3">8 caractères minimum.</p>
+          <ReglesMotDePasse motDePasse={motDePasse} />
 
           {erreur && (
             <p role="alert" className="text-sm text-card-red bg-card-red-bg rounded px-3 py-2 mb-3">

@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import AppLayout from '../components/AppLayout';
 import { supabase } from '../lib/supabaseClient';
+import { motDePasseValide, MESSAGE_REGLES_MOT_DE_PASSE } from '../lib/motDePasse';
+import ReglesMotDePasse from '../components/ReglesMotDePasse';
 
 export default function MonProfil() {
   const [motDePasse, setMotDePasse] = useState('');
@@ -14,8 +16,8 @@ export default function MonProfil() {
     setErreur(null);
     setSucces(false);
 
-    if (motDePasse.length < 8) {
-      setErreur('Le mot de passe doit faire au moins 8 caractères.');
+    if (!motDePasseValide(motDePasse)) {
+      setErreur(MESSAGE_REGLES_MOT_DE_PASSE);
       return;
     }
     if (motDePasse !== confirmation) {
@@ -58,9 +60,9 @@ export default function MonProfil() {
           minLength={8}
           value={confirmation}
           onChange={(e) => setConfirmation(e.target.value)}
-          className="w-full border border-border rounded px-3 py-2 mb-1"
+          className="w-full border border-border rounded px-3 py-2 mb-2"
         />
-        <p className="text-xs text-muted mb-3">8 caractères minimum.</p>
+        <ReglesMotDePasse motDePasse={motDePasse} />
 
         {erreur && (
           <p role="alert" className="text-sm text-card-red bg-card-red-bg rounded px-3 py-2 mb-3">
