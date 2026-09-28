@@ -7,7 +7,6 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
-import { logActivity } from '../lib/activityLog';
 
 export type AppRole = 'admin' | 'formateur' | 'arbitre';
 
@@ -61,14 +60,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((event, newSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((_event, newSession) => {
       setSession(newSession);
       if (newSession) {
         setLoading(true);
         loadProfileAndRoles(newSession.user.id).finally(() => setLoading(false));
-        if (event === 'SIGNED_IN') {
-          logActivity("s'est connecté");
-        }
       } else {
         setProfile(null);
         setRoles([]);
