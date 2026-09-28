@@ -4,6 +4,8 @@ import AdminNav from '../../components/AdminNav';
 import { supabase } from '../../lib/supabaseClient';
 import { extraireErreurFonction } from '../../lib/functionsError';
 import { logActivity } from '../../lib/activityLog';
+import { motDePasseValide, MESSAGE_REGLES_MOT_DE_PASSE } from '../../lib/motDePasse';
+import ReglesMotDePasse from '../../components/ReglesMotDePasse';
 import type { AppRole } from '../../hooks/useAuth';
 
 interface PersonneAvecRoles {
@@ -189,8 +191,8 @@ export default function Comptes() {
   async function reinitialiserMotDePasse(personneId: string, nomPersonne: string) {
     setErreurMdp(null);
     setSuccesMdp(false);
-    if (nouveauMotDePasse.length < 8) {
-      setErreurMdp('Le mot de passe doit faire au moins 8 caractères.');
+    if (!motDePasseValide(nouveauMotDePasse)) {
+      setErreurMdp(MESSAGE_REGLES_MOT_DE_PASSE);
       return;
     }
     setEnregistrementMdp(true);
@@ -892,9 +894,8 @@ export default function Comptes() {
                   </div>
                   {erreurMdp && <p className="text-xs text-card-red">{erreurMdp}</p>}
                   {succesMdp && <p className="text-xs text-pitch-dark">Mot de passe mis à jour.</p>}
-                  <p className="text-xs text-muted">
-                    8 caractères minimum. Transmets-le à la personne concernée.
-                  </p>
+                  <ReglesMotDePasse motDePasse={nouveauMotDePasse} />
+                  <p className="text-xs text-muted -mt-2">Transmets-le à la personne concernée.</p>
                 </div>
 
                 <div>
