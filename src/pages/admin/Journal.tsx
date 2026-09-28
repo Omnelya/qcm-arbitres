@@ -29,6 +29,9 @@ export default function Journal() {
       let requete = supabase
         .from('activity_log')
         .select('id, action, created_at, user_id')
+        // Les connexions ne figurent plus dans le journal : la dernière
+        // connexion de chacun est affichée dans l'onglet Comptes.
+        .neq('action', "s'est connecté")
         .order('created_at', { ascending: false })
         .limit(100);
 

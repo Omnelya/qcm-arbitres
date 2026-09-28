@@ -13,6 +13,18 @@ interface PersonneAvecRoles {
   full_name: string;
   email: string;
   roles: AppRole[];
+  // undefined = information indisponible ; null = jamais connecté
+  derniereConnexion?: string | null;
+}
+
+function texteDerniereConnexion(d: string | null): string {
+  if (!d) return 'Jamais connecté';
+  const date = new Date(d);
+  const jour = date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const heure = date
+    .toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+    .replace(':', 'h');
+  return `Dernière connexion : ${jour} à ${heure}`;
 }
 
 interface LigneImport {
@@ -112,10 +124,24 @@ export default function Comptes() {
     setLoading(true);
     setError(null);
 
-    const [{ data: profils, error: err1 }, { data: roleRows, error: err2 }] = await Promise.all([
+    const [
+      { data: profils, error: err1 },
+      { data: roleRows, error: err2 },
+      { data: connexions },
+    ] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email').order('full_name'),
       supabase.from('user_roles').select('user_id, role'),
+      supabase.rpc('admin_dernieres_connexions'),
     ]);
+    // Si la fonction n'est pas disponible, on affiche simplement la liste
+    // sans les dates de connexion plutôt que de bloquer la page.
+    const connexionsParId: Record<string, string | null> = Object.fromEntries(
+      ((connexions ?? []) as { user_id: string; last_sign_in_at: string | null }[]).map((c) => [
+        c.user_id,
+        c.last_sign_in_at,
+      ])
+    );
+    const connexionsDisponibles = Array.isArray(connexions);
 
     if (err1 || err2) {
       setError('Impossible de charger la liste des comptes. Réessaie dans un instant.');
@@ -130,6 +156,7 @@ export default function Comptes() {
       roles: (roleRows ?? [])
         .filter((r) => r.user_id === p.id)
         .map((r) => r.role as AppRole),
+      derniereConnexion: connexionsDisponibles ? (connexionsParId[p.id] ?? null) : undefined,
     }));
     setPersonnes(liste);
     setLoading(false);
@@ -817,7 +844,13 @@ export default function Comptes() {
               </span>
               <span className="flex-1">
                 <span className="block text-sm font-medium">{p.full_name}</span>
-                <span className="block text-xs text-muted mb-1.5">{p.email}</span>
+                <span className="block text-xs text-muted">{p.email}</span>
+                {p.derniereConnexion !== undefined && (
+                  <span className="block text-xs text-muted">
+                    {texteDerniereConnexion(p.derniereConnexion)}
+                  </span>
+                )}
+                <span className="block mb-1.5" />
                 <span className="flex gap-1 flex-wrap">
                   {p.roles.length === 0 && (
                     <span className="text-xs text-muted">Aucun rôle attribué</span>
