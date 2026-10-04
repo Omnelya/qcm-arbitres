@@ -202,6 +202,22 @@ export default function Comptes() {
     chargerFileAttente();
   }, []);
 
+  // Fiche ouverte : la touche Échap la ferme, et la liste derrière ne
+  // défile plus tant qu'elle est affichée.
+  useEffect(() => {
+    if (!ouvert) return;
+    const surTouche = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOuvert(null);
+    };
+    document.addEventListener('keydown', surTouche);
+    const defilementAvant = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.removeEventListener('keydown', surTouche);
+      document.body.style.overflow = defilementAvant;
+    };
+  }, [ouvert]);
+
   async function basculerRole(personneId: string, role: AppRole, actif: boolean) {
     setEnregistrement(true);
     if (actif) {
@@ -263,8 +279,7 @@ export default function Comptes() {
   }
 
   function ouvrirPanneau(p: PersonneAvecRoles) {
-    const memePersonne = ouvert === p.id;
-    setOuvert(memePersonne ? null : p.id);
+    setOuvert(p.id);
     setNomEdite(p.full_name);
     setNouveauMotDePasse('');
     setErreurMdp(null);
@@ -675,6 +690,9 @@ export default function Comptes() {
     return p.full_name.toLowerCase().includes(texte) || p.email.toLowerCase().includes(texte);
   });
 
+  // Personne dont la fiche est ouverte (fenêtre par-dessus la liste)
+  const personneOuverte = personnes.find((x) => x.id === ouvert) ?? null;
+
   const fileAttenteFiltree = fileAttente.filter((f) => {
     if (filtreStatutFile !== 'tous' && f.status !== filtreStatutFile) return false;
     const texte = rechercheFile.trim().toLowerCase();
@@ -1007,7 +1025,7 @@ export default function Comptes() {
               type="button"
               className="w-full flex items-start gap-3 text-left"
               onClick={() => ouvrirPanneau(p)}
-              aria-expanded={ouvert === p.id}
+              aria-haspopup="dialog"
             >
               <span className="w-9 h-9 rounded-full bg-pitch-light text-pitch-dark flex items-center justify-center text-sm font-medium shrink-0">
                 {initiales(p.full_name)}
@@ -1047,10 +1065,72 @@ export default function Comptes() {
                   )}
                 </span>
               </span>
+              <span className="text-muted shrink-0" aria-hidden="true">
+                ›
+              </span>
             </button>
+          </li>
+        ))}
+      </ul>
 
-            {ouvert === p.id && (
-              <div className="mt-3 pl-12 flex flex-col gap-4">
+      {personneOuverte &&
+        ((p: PersonneAvecRoles) => (
+          <div className="fixed inset-0 z-50 bg-ink/45 overflow-y-auto" onClick={() => setOuvert(null)}>
+            <div className="min-h-full flex items-start justify-center p-4">
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={`Fiche de ${p.full_name}`}
+                className="bg-canvas rounded-[14px] w-full max-w-xl p-4 flex flex-col gap-3"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start gap-3">
+                  <span className="w-9 h-9 rounded-full bg-pitch-light text-pitch-dark flex items-center justify-center text-sm font-medium shrink-0">
+                    {initiales(p.full_name)}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-sm font-medium">{p.full_name}</span>
+                    <span className="block text-xs text-muted break-all">{p.email}</span>
+                    {p.derniereConnexion !== undefined && (
+                      <span className="block text-xs text-muted">
+                        {texteDerniereConnexion(p.derniereConnexion)}
+                      </span>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOuvert(null)}
+                    aria-label="Fermer la fiche"
+                    className="w-8 h-8 shrink-0 rounded-full border border-border bg-surface text-sm leading-none"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <div className="bg-surface border border-border rounded p-3 min-w-0">
+                  <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted mb-2.5">Identité</h3>
+                  <label className="block text-xs text-muted mb-1">Nom complet</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={nomEdite}
+                      onChange={(e) => setNomEdite(e.target.value)}
+                      className="flex-1 border border-border rounded px-3 py-1.5 text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => enregistrerNom(p.id)}
+                      disabled={enregistrementNom || !nomEdite.trim() || nomEdite === p.full_name}
+                      className="text-xs border border-border rounded px-3 disabled:opacity-50"
+                    >
+                      {enregistrementNom ? '…' : 'Enregistrer'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className={structuresDisponibles ? 'grid sm:grid-cols-2 gap-3' : ''}>
+                <div className="bg-surface border border-border rounded p-3 min-w-0">
+                  <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted mb-2.5">Rôles</h3>
                 <div className="flex flex-col gap-2">
                   {TOUS_LES_ROLES.map((role) => {
                     const actif = p.roles.includes(role);
@@ -1067,10 +1147,11 @@ export default function Comptes() {
                     );
                   })}
                 </div>
+                </div>
 
                 {structuresDisponibles && (
-                  <div>
-                    <p className="text-xs text-muted mb-1">Structure(s)</p>
+                  <div className="bg-surface border border-border rounded p-3 min-w-0">
+                    <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted mb-2.5">Structures</h3>
                     <div className="flex flex-col gap-2">
                       {structures.length === 0 && (
                         <p className="text-xs text-muted">
@@ -1095,27 +1176,10 @@ export default function Comptes() {
                     {erreurStructure && <p className="text-xs text-card-red mt-1">{erreurStructure}</p>}
                   </div>
                 )}
-
-                <div>
-                  <label className="block text-xs text-muted mb-1">Nom complet</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={nomEdite}
-                      onChange={(e) => setNomEdite(e.target.value)}
-                      className="flex-1 border border-border rounded px-3 py-1.5 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => enregistrerNom(p.id)}
-                      disabled={enregistrementNom || !nomEdite.trim() || nomEdite === p.full_name}
-                      className="text-xs border border-border rounded px-3 disabled:opacity-50"
-                    >
-                      {enregistrementNom ? '…' : 'Enregistrer'}
-                    </button>
-                  </div>
                 </div>
 
+                <div className="bg-surface border border-border rounded p-3 min-w-0 flex flex-col gap-4">
+                  <h3 className="text-[11px] uppercase tracking-wider font-semibold text-muted -mb-1.5">Accès au compte</h3>
                 <div>
                   <label className="block text-xs text-muted mb-1">Réinitialiser le mot de passe</label>
                   <div className="flex gap-2 mb-1">
@@ -1193,13 +1257,15 @@ export default function Comptes() {
                     </div>
                   )}
                 </div>
+                </div>
 
-                <div className="pt-3 border-t border-border">
+                <div className="bg-card-red-bg rounded p-3">
+                  <h3 className="text-[11px] uppercase tracking-wider font-semibold text-card-red mb-2.5">Zone sensible</h3>
                   {confirmationSuppression !== p.id ? (
                     <button
                       type="button"
                       onClick={() => demanderConfirmationSuppression(p)}
-                      className="w-full text-xs border border-border rounded py-1.5 text-card-red"
+                      className="w-full text-xs border border-border bg-surface rounded py-1.5 text-card-red"
                     >
                       Supprimer ce compte
                     </button>
@@ -1218,7 +1284,7 @@ export default function Comptes() {
                         <button
                           type="button"
                           onClick={() => setConfirmationSuppression(null)}
-                          className="flex-1 border border-border rounded py-1.5 text-xs"
+                          className="flex-1 border border-border bg-surface rounded py-1.5 text-xs"
                         >
                           Annuler
                         </button>
@@ -1235,10 +1301,9 @@ export default function Comptes() {
                   )}
                 </div>
               </div>
-            )}
-          </li>
-        ))}
-      </ul>
+            </div>
+          </div>
+        ))(personneOuverte)}
 
       {!loading && !error && personnes.length === 0 && (
         <p className="text-sm text-muted">Aucun compte pour le moment.</p>
