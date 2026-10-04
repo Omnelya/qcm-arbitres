@@ -1,6 +1,7 @@
 import { useState, type FormEvent, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { consommerMessageDeconnexion } from '../lib/inactivite';
 
 export default function Login() {
   const { signIn, session, loading, roles } = useAuth();
@@ -11,6 +12,12 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [motDePasseDefini, setMotDePasseDefini] = useState(false);
+  const [deconnecteInactivite, setDeconnecteInactivite] = useState(false);
+
+  // Message d'explication après une déconnexion automatique.
+  useEffect(() => {
+    if (!loading && consommerMessageDeconnexion()) setDeconnecteInactivite(true);
+  }, [loading]);
 
   // Une fois connecté ET les rôles chargés, on part automatiquement
   // vers le bon espace — sans dépendre d'un clic ou d'un délai fixe.
@@ -50,6 +57,12 @@ export default function Login() {
         {motDePasseDefini && (
           <p className="text-sm text-pitch-dark bg-pitch-light rounded px-3 py-2 mb-4">
             Mot de passe défini avec succès. Connecte-toi pour continuer.
+          </p>
+        )}
+
+        {deconnecteInactivite && !motDePasseDefini && (
+          <p className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2 mb-4">
+            Tu as été déconnecté après 5 minutes d'inactivité. Reconnecte-toi pour continuer.
           </p>
         )}
 

@@ -12,6 +12,8 @@ interface PersonneAvecRoles {
   id: string;
   full_name: string;
   email: string;
+  // Date d'ajout du compte
+  created_at: string;
   roles: AppRole[];
   // Identifiants des structures auxquelles la personne appartient
   structures: string[];
@@ -54,6 +56,23 @@ interface InviteQueueRow {
 }
 
 const TOUS_LES_ROLES: AppRole[] = ['admin', 'formateur', 'arbitre'];
+
+const LIBELLES_TRI = {
+  'nom-az': 'Nom (A → Z)',
+  'nom-za': 'Nom (Z → A)',
+  'connexion-recente': 'Dernière connexion (la plus récente d\'abord)',
+  'connexion-ancienne': 'Dernière connexion (la plus ancienne d\'abord)',
+  'jamais-connecte': 'Jamais connectés d\'abord',
+  'ajout-recent': 'Date d\'ajout (les plus récents d\'abord)',
+  'ajout-ancien': 'Date d\'ajout (les plus anciens d\'abord)',
+  role: 'Rôle (administrateur, formateur, arbitre)',
+  structure: 'Structure (A → Z)',
+} as const;
+type Tri = keyof typeof LIBELLES_TRI;
+
+function formatDate(d: string) {
+  return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
 const LABELS: Record<AppRole, string> = {
   admin: 'Administrateur',
   formateur: 'Formateur',
@@ -86,6 +105,16 @@ export default function Comptes() {
   const [structures, setStructures] = useState<StructureRow[]>([]);
   const [structuresDisponibles, setStructuresDisponibles] = useState(false);
   const [filtreStructure, setFiltreStructure] = useState('toutes');
+  const [filtreRole, setFiltreRole] = useState<'tous' | 'aucun' | AppRole>('tous');
+  // Le tri choisi est mémorisé dans le navigateur d'une visite à l'autre.
+  const [tri, setTri] = useState<Tri>(() => {
+    try {
+      const memorise = localStorage.getItem('qcm-comptes-tri');
+      return memorise && memorise in LIBELLES_TRI ? (memorise as Tri) : 'nom-az';
+    } catch {
+      return 'nom-az';
+    }
+  });
   const [structuresCreation, setStructuresCreation] = useState<string[]>([]);
   const [erreurStructure, setErreurStructure] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -149,7 +178,7 @@ export default function Comptes() {
       { data: structuresData, error: errStructures },
       { data: affectations },
     ] = await Promise.all([
-      supabase.from('profiles').select('id, full_name, email').order('full_name'),
+      supabase.from('profiles').select('id, full_name, email, created_at').order('full_name'),
       supabase.from('user_roles').select('user_id, role'),
       supabase.rpc('admin_dernieres_connexions'),
       supabase.from('structures').select('id, name').order('name'),
@@ -177,6 +206,7 @@ export default function Comptes() {
       id: p.id,
       full_name: p.full_name,
       email: p.email,
+      created_at: p.created_at,
       roles: (roleRows ?? [])
         .filter((r) => r.user_id === p.id)
         .map((r) => r.role as AppRole),
@@ -680,7 +710,71 @@ export default function Comptes() {
       .toUpperCase();
   }
 
+  function changerTri(valeur: Tri) {
+    setTri(valeur);
+    try {
+      localStorage.setItem('qcm-comptes-tri', valeur);
+    } catch {
+      // Sans importance : le tri ne sera simplement pas mémorisé.
+    }
+  }
+
+  const connexionsConnues = personnes.some((p) => p.derniereConnexion !== undefined);
+  // Un tri devenu indisponible (ex. structures pas encore installées)
+  // retombe sur l'ordre alphabétique.
+  const triActif: Tri =
+    (tri === 'structure' && !structuresDisponibles) ||
+    (['connexion-recente', 'connexion-ancienne', 'jamais-connecte'].includes(tri) && !connexionsConnues)
+      ? 'nom-az'
+      : tri;
+
+  function comparer(a: PersonneAvecRoles, b: PersonneAvecRoles): number {
+    const parNom = a.full_name.localeCompare(b.full_name, 'fr', { sensitivity: 'base' });
+    const temps = (d: string | null | undefined) => (d ? new Date(d).getTime() : null);
+    const ca = temps(a.derniereConnexion);
+    const cb = temps(b.derniereConnexion);
+    switch (triActif) {
+      case 'nom-za':
+        return -parNom;
+      case 'connexion-recente':
+        // Les comptes jamais connectés vont à la fin.
+        if (ca === null || cb === null) return ca === cb ? parNom : ca === null ? 1 : -1;
+        return cb - ca || parNom;
+      case 'connexion-ancienne':
+        if (ca === null || cb === null) return ca === cb ? parNom : ca === null ? 1 : -1;
+        return ca - cb || parNom;
+      case 'jamais-connecte':
+        if (ca === null || cb === null) return ca === cb ? parNom : ca === null ? -1 : 1;
+        return ca - cb || parNom;
+      case 'ajout-recent':
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime() || parNom;
+      case 'ajout-ancien':
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime() || parNom;
+      case 'role': {
+        const rang = (p: PersonneAvecRoles) => {
+          const rangs = p.roles.map((r) => TOUS_LES_ROLES.indexOf(r));
+          return rangs.length > 0 ? Math.min(...rangs) : TOUS_LES_ROLES.length;
+        };
+        return rang(a) - rang(b) || parNom;
+      }
+      case 'structure': {
+        // Première structure de la personne par ordre alphabétique ; les
+        // comptes sans structure vont à la fin.
+        const premiere = (p: PersonneAvecRoles) =>
+          p.structures.map(nomStructure).sort((x, y) => x.localeCompare(y, 'fr'))[0] ?? null;
+        const sa = premiere(a);
+        const sb = premiere(b);
+        if (sa === null || sb === null) return sa === sb ? parNom : sa === null ? 1 : -1;
+        return sa.localeCompare(sb, 'fr', { sensitivity: 'base' }) || parNom;
+      }
+      default:
+        return parNom;
+    }
+  }
+
   const personnesFiltrees = personnes.filter((p) => {
+    if (filtreRole === 'aucun' && p.roles.length > 0) return false;
+    if (filtreRole !== 'tous' && filtreRole !== 'aucun' && !p.roles.includes(filtreRole)) return false;
     if (filtreStructure === 'aucune' && p.structures.length > 0) return false;
     if (filtreStructure !== 'toutes' && filtreStructure !== 'aucune' && !p.structures.includes(filtreStructure)) {
       return false;
@@ -688,7 +782,7 @@ export default function Comptes() {
     const texte = recherche.trim().toLowerCase();
     if (!texte) return true;
     return p.full_name.toLowerCase().includes(texte) || p.email.toLowerCase().includes(texte);
-  });
+  }).sort(comparer);
 
   // Personne dont la fiche est ouverte (fenêtre par-dessus la liste)
   const personneOuverte = personnes.find((x) => x.id === ouvert) ?? null;
@@ -998,24 +1092,73 @@ export default function Comptes() {
           className="w-full border border-border rounded px-3 py-2 mb-3 text-sm"
         />
       )}
-      {!loading && !error && personnes.length > 0 && structuresDisponibles && (
-        <select
-          value={filtreStructure}
-          onChange={(e) => setFiltreStructure(e.target.value)}
-          aria-label="Filtrer par structure"
-          className="w-full border border-border rounded px-3 py-2 mb-3 text-sm"
-        >
-          <option value="toutes">Toutes les structures</option>
-          <option value="aucune">Sans structure</option>
-          {structures.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+      {!loading && !error && personnes.length > 0 && (
+        <>
+          <div className="flex gap-2 mb-2">
+            <select
+              value={filtreRole}
+              onChange={(e) => setFiltreRole(e.target.value as typeof filtreRole)}
+              aria-label="Filtrer par rôle"
+              className="flex-1 min-w-0 border border-border rounded px-3 py-2 text-sm"
+            >
+              <option value="tous">Tous les rôles</option>
+              {TOUS_LES_ROLES.map((r) => (
+                <option key={r} value={r}>
+                  {LABELS[r]}
+                </option>
+              ))}
+              <option value="aucun">Aucun rôle</option>
+            </select>
+            {structuresDisponibles && (
+              <select
+                value={filtreStructure}
+                onChange={(e) => setFiltreStructure(e.target.value)}
+                aria-label="Filtrer par structure"
+                className="flex-1 min-w-0 border border-border rounded px-3 py-2 text-sm"
+              >
+                <option value="toutes">Toutes les structures</option>
+                <option value="aucune">Sans structure</option>
+                {structures.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mb-1">
+            <label htmlFor="tri-comptes" className="text-xs text-muted shrink-0">
+              Trier par
+            </label>
+            <select
+              id="tri-comptes"
+              value={triActif}
+              onChange={(e) => changerTri(e.target.value as Tri)}
+              className="flex-1 min-w-0 border border-border rounded px-3 py-2 text-sm"
+            >
+              {(Object.keys(LIBELLES_TRI) as Tri[])
+                .filter((t) => t !== 'structure' || structuresDisponibles)
+                .filter(
+                  (t) =>
+                    connexionsConnues ||
+                    !['connexion-recente', 'connexion-ancienne', 'jamais-connecte'].includes(t)
+                )
+                .map((t) => (
+                  <option key={t} value={t}>
+                    {LIBELLES_TRI[t]}
+                  </option>
+                ))}
+            </select>
+          </div>
+          <p className="text-xs text-muted mb-1">
+            {personnesFiltrees.length === personnes.length
+              ? `${personnes.length} compte(s)`
+              : `${personnesFiltrees.length} compte(s) sur ${personnes.length}`}
+          </p>
+        </>
       )}
       {personnes.length > 0 && personnesFiltrees.length === 0 && (
-        <p className="text-sm text-muted">Aucun compte ne correspond à cette recherche.</p>
+        <p className="text-sm text-muted mt-2">Aucun compte ne correspond à ces critères.</p>
       )}
 
       <ul>
@@ -1037,6 +1180,9 @@ export default function Comptes() {
                   <span className="block text-xs text-muted">
                     {texteDerniereConnexion(p.derniereConnexion)}
                   </span>
+                )}
+                {(triActif === 'ajout-recent' || triActif === 'ajout-ancien') && (
+                  <span className="block text-xs text-muted">Ajouté le {formatDate(p.created_at)}</span>
                 )}
                 <span className="block mb-1.5" />
                 <span className="flex gap-1 flex-wrap">
@@ -1096,6 +1242,7 @@ export default function Comptes() {
                         {texteDerniereConnexion(p.derniereConnexion)}
                       </span>
                     )}
+                    <span className="block text-xs text-muted">Compte ajouté le {formatDate(p.created_at)}</span>
                   </span>
                   <button
                     type="button"

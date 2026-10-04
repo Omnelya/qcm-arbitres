@@ -4,6 +4,7 @@ import AppLayout from '../../components/AppLayout';
 import { supabase } from '../../lib/supabaseClient';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
 import { useAuth } from '../../hooks/useAuth';
+import { useSuspendreDeconnexionInactivite } from '../../lib/inactivite';
 
 // Marge silencieuse ajoutée au temps saisi par le formateur — voir la
 // migration 20260925213000_marge_dix_secondes_qcm.sql pour le détail et
@@ -21,6 +22,10 @@ interface QuestionExamen {
 }
 
 export default function QuizAttempt() {
+  // Pendant un QCM, l'arbitre peut réfléchir ou regarder une vidéo sans
+  // toucher l'écran : pas de déconnexion automatique (le QCM a déjà sa
+  // propre limite de temps).
+  useSuspendreDeconnexionInactivite(true);
   const { id: quizId } = useParams();
   const { session } = useAuth();
   const navigate = useNavigate();

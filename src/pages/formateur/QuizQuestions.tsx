@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import { supabase } from '../../lib/supabaseClient';
+import { useSuspendreDeconnexionInactivite } from '../../lib/inactivite';
 import { extraireErreurFonction } from '../../lib/functionsError';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
 
@@ -69,6 +70,9 @@ export default function QuizQuestions() {
   const [erreurForm, setErreurForm] = useState<string | null>(null);
 
   const [envoisEnCours, setEnvoisEnCours] = useState<EnvoiEnCours[]>([]);
+  // Un envoi de vidéo peut durer plus de 5 minutes : pas de déconnexion
+  // automatique tant qu'il n'est pas terminé.
+  useSuspendreDeconnexionInactivite(envoisEnCours.length > 0);
   const [questionsDepliees, setQuestionsDepliees] = useState<Set<string>>(new Set());
   const [mediaUrlsApercu, setMediaUrlsApercu] = useState<Record<string, string>>({});
   const [chargementMediaApercu, setChargementMediaApercu] = useState<string | null>(null);

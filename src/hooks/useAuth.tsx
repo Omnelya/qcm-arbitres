@@ -7,6 +7,12 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import DeconnexionInactivite from '../components/DeconnexionInactivite';
+import {
+  activiteEnregistreePerimee,
+  memoriserMessageDeconnexion,
+  signalerActivite,
+} from '../lib/inactivite';
 
 export type AppRole = 'admin' | 'formateur' | 'arbitre';
 
@@ -52,6 +58,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
+      // Retour sur le site avec une session restée ouverte alors que la
+      // dernière activité date de plus de 5 minutes (navigateur fermé
+      // puis rouvert, par exemple) : on déconnecte tout de suite. Les
+      // arrivées par un lien reçu par e-mail (activation, mot de passe
+      // oublié) ne sont pas concernées.
+      const arriveeParLien = /access_token=|[?&]code=|type=(invite|recovery)/.test(
+        window.location.hash + window.location.search
+      );
+      if (data.session && !arriveeParLien && activiteEnregistreePerimee()) {
+        deconnecterPourInactivite();
+        setLoading(false);
+        return;
+      }
+      if (data.session) signalerActivite();
       setSession(data.session);
       if (data.session) {
         loadProfileAndRoles(data.session.user.id).finally(() => setLoading(false));
@@ -75,7 +95,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.subscription.unsubscribe();
   }, []);
 
+  // scope 'local' : seule la session de CE navigateur est fermée (une
+  // personne aussi connectée sur son téléphone n'y est pas déconnectée).
+  async function deconnecterPourInactivite() {
+    memoriserMessageDeconnexion();
+    await supabase.auth.signOut({ scope: 'local' });
+  }
+
   async function signIn(email: string, password: string) {
+    signalerActivite();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     return { error: error ? traduireErreur(error.message) : null };
   }
@@ -89,6 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{ loading, session, profile, roles, activeRole, setActiveRole, signIn, signOut }}
     >
       {children}
+      {session && <DeconnexionInactivite onDeconnexion={deconnecterPourInactivite} />}
     </AuthContext.Provider>
   );
 }
