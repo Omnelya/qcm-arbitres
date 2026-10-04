@@ -13,6 +13,8 @@ interface PersonneAvecRoles {
   full_name: string;
   email: string;
   roles: AppRole[];
+  // Identifiants des structures auxquelles la personne appartient
+  structures: string[];
   // undefined = information indisponible ; null = jamais connecté
   derniereConnexion?: string | null;
 }
@@ -31,6 +33,13 @@ interface LigneImport {
   full_name: string;
   email: string;
   roles: AppRole[];
+  // Identifiants des structures à attribuer à la création du compte
+  structures: string[];
+}
+
+interface StructureRow {
+  id: string;
+  name: string;
 }
 
 interface InviteQueueRow {
@@ -70,6 +79,15 @@ function formatDateHeure(d: string) {
 export default function Comptes() {
   const [personnes, setPersonnes] = useState<PersonneAvecRoles[]>([]);
   const [recherche, setRecherche] = useState('');
+  // --- Structures ---
+  // structuresDisponibles = false tant que la mise à jour SQL des
+  // structures n'a pas été exécutée dans Supabase : la page fonctionne
+  // alors comme avant, sans rien afficher sur les structures.
+  const [structures, setStructures] = useState<StructureRow[]>([]);
+  const [structuresDisponibles, setStructuresDisponibles] = useState(false);
+  const [filtreStructure, setFiltreStructure] = useState('toutes');
+  const [structuresCreation, setStructuresCreation] = useState<string[]>([]);
+  const [erreurStructure, setErreurStructure] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ouvert, setOuvert] = useState<string | null>(null);
@@ -128,11 +146,17 @@ export default function Comptes() {
       { data: profils, error: err1 },
       { data: roleRows, error: err2 },
       { data: connexions },
+      { data: structuresData, error: errStructures },
+      { data: affectations },
     ] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email').order('full_name'),
       supabase.from('user_roles').select('user_id, role'),
       supabase.rpc('admin_dernieres_connexions'),
+      supabase.from('structures').select('id, name').order('name'),
+      supabase.from('user_structures').select('user_id, structure_id'),
     ]);
+    setStructuresDisponibles(!errStructures);
+    setStructures(structuresData ?? []);
     // Si la fonction n'est pas disponible, on affiche simplement la liste
     // sans les dates de connexion plutôt que de bloquer la page.
     const connexionsParId: Record<string, string | null> = Object.fromEntries(
@@ -156,6 +180,7 @@ export default function Comptes() {
       roles: (roleRows ?? [])
         .filter((r) => r.user_id === p.id)
         .map((r) => r.role as AppRole),
+      structures: (affectations ?? []).filter((a) => a.user_id === p.id).map((a) => a.structure_id),
       derniereConnexion: connexionsDisponibles ? (connexionsParId[p.id] ?? null) : undefined,
     }));
     setPersonnes(liste);
@@ -188,6 +213,55 @@ export default function Comptes() {
     setEnregistrement(false);
   }
 
+  async function basculerStructure(p: PersonneAvecRoles, structure: StructureRow, actif: boolean) {
+    setEnregistrement(true);
+    setErreurStructure(null);
+    const { error: err } = actif
+      ? await supabase.from('user_structures').delete().eq('user_id', p.id).eq('structure_id', structure.id)
+      : await supabase.from('user_structures').insert({ user_id: p.id, structure_id: structure.id });
+    if (err) {
+      setErreurStructure("La modification de la structure a échoué. Réessaie dans un instant.");
+    } else {
+      await logActivity(
+        actif
+          ? `a retiré ${p.full_name} de la structure « ${structure.name} »`
+          : `a ajouté ${p.full_name} à la structure « ${structure.name} »`,
+        'profile',
+        p.id
+      );
+    }
+    await charger();
+    setEnregistrement(false);
+  }
+
+  function nomStructure(id: string) {
+    return structures.find((s) => s.id === id)?.name ?? '—';
+  }
+
+  // Les invitations sont envoyées en différé : le compte n'existe pas
+  // encore au moment où l'admin choisit les structures. On les enregistre
+  // donc "en attente" pour chaque e-mail ; la base de données les applique
+  // automatiquement dès que le compte est créé.
+  async function enregistrerStructuresEnAttente(lignes: { email: string; structures: string[] }[]) {
+    if (!structuresDisponibles || lignes.length === 0) return;
+    const emails = lignes.map((l) => l.email.trim().toLowerCase());
+    await supabase.from('structures_en_attente').delete().in('email', emails);
+    const aInserer = lignes.flatMap((l) =>
+      l.structures.map((structure_id) => ({ email: l.email.trim().toLowerCase(), structure_id }))
+    );
+    if (aInserer.length > 0) {
+      await supabase.from('structures_en_attente').insert(aInserer);
+    }
+  }
+
+  async function annulerStructuresEnAttente(emails: string[]) {
+    if (!structuresDisponibles || emails.length === 0) return;
+    await supabase
+      .from('structures_en_attente')
+      .delete()
+      .in('email', emails.map((e) => e.trim().toLowerCase()));
+  }
+
   function ouvrirPanneau(p: PersonneAvecRoles) {
     const memePersonne = ouvert === p.id;
     setOuvert(memePersonne ? null : p.id);
@@ -198,6 +272,7 @@ export default function Comptes() {
     setConfirmationSuppression(null);
     setAvertissementSuppression(null);
     setErreurSuppression(null);
+    setErreurStructure(null);
     setLienActivationPanneau(null);
     setErreurLienPanneau(null);
     setLienPanneauCopie(false);
@@ -342,10 +417,15 @@ export default function Comptes() {
     setRolesCreation((prev) => (prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role]));
   }
 
+  function basculerStructureCreation(id: string) {
+    setStructuresCreation((prev) => (prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]));
+  }
+
   function reinitialiserFormulaireCreation() {
     setNomComplet('');
     setEmail('');
     setRolesCreation([]);
+    setStructuresCreation([]);
     setMethodeCreation('email');
     setConfirmationEmail(null);
     setLienGenere(null);
@@ -365,6 +445,7 @@ export default function Comptes() {
     }
 
     setCreation(true);
+    await enregistrerStructuresEnAttente([{ email, structures: structuresCreation }]);
 
     if (methodeCreation === 'lien') {
       const { data, error } = await supabase.functions.invoke('create-user', {
@@ -373,9 +454,12 @@ export default function Comptes() {
       setCreation(false);
 
       if (error || data?.error) {
+        await annulerStructuresEnAttente([email]);
         setErreurCreation(await extraireErreurFonction(error, data));
         return;
       }
+      // Compte déjà existant : ses structures se gèrent depuis sa fiche.
+      if (data.renvoi) await annulerStructuresEnAttente([email]);
       setLienGenere(data.link);
       setLienEstRenvoi(Boolean(data.renvoi));
       await logActivity(
@@ -396,10 +480,12 @@ export default function Comptes() {
     setCreation(false);
 
     if (error || data?.error) {
+      await annulerStructuresEnAttente([email]);
       setErreurCreation(await extraireErreurFonction(error, data));
       return;
     }
     if (data?.queued === 0) {
+      await annulerStructuresEnAttente([email]);
       setErreurCreation(data?.erreurs?.[0]?.erreur ?? "La mise en file d'attente a échoué.");
       return;
     }
@@ -421,14 +507,22 @@ export default function Comptes() {
   async function telechargerModele() {
     const XLSX = await import('xlsx');
     const feuilleComptes = XLSX.utils.aoa_to_sheet([
-      ['Nom complet', 'E-mail', 'Rôle'],
-      ['Jean Dupont', 'jean.dupont@exemple.fr', 'arbitre'],
+      ['Nom complet', 'E-mail', 'Rôle', 'Structure'],
+      ['Jean Dupont', 'jean.dupont@exemple.fr', 'arbitre', structures[0]?.name ?? ''],
     ]);
     const feuilleInstructions = XLSX.utils.aoa_to_sheet([
       ['Instructions'],
       ['Une ligne par personne à créer.'],
       ['Colonne "Rôle" : exactement admin, formateur ou arbitre (un seul par ligne).'],
       ["Un 2e rôle pourra être ajouté ensuite depuis la fiche du compte, une fois créé."],
+      [
+        'Colonne "Structure" (facultative) : nom exact d\'une structure existante. Pour plusieurs structures, sépare les noms par un point-virgule (ex. Structure A;Structure B).',
+      ],
+      [
+        structures.length > 0
+          ? `Structures existantes : ${structures.map((s) => s.name).join(' ; ')}`
+          : "Aucune structure n'existe pour le moment (onglet Structures).",
+      ],
       ["Supprime la ligne d'exemple (Jean Dupont) avant de déposer le fichier."],
     ]);
     const classeur = XLSX.utils.book_new();
@@ -462,6 +556,11 @@ export default function Comptes() {
       const emailLigne = String(ligne['E-mail'] ?? '').trim().toLowerCase();
       const role = String(ligne['Rôle'] ?? '').trim().toLowerCase();
 
+      const nomsStructures = String(ligne['Structure'] ?? '')
+        .split(';')
+        .map((n) => n.trim())
+        .filter(Boolean);
+
       if (!nom && !emailLigne && !role) return; // ligne vide, ignorée silencieusement
 
       if (!nom) {
@@ -480,8 +579,24 @@ export default function Comptes() {
         erreurs.push(`Ligne ${numeroLigne} : e-mail en double dans le fichier (${emailLigne}).`);
         return;
       }
+      const idsStructures: string[] = [];
+      for (const nomS of nomsStructures) {
+        const trouvee = structures.find((s) => s.name.trim().toLowerCase() === nomS.toLowerCase());
+        if (!trouvee) {
+          erreurs.push(
+            `Ligne ${numeroLigne} : structure "${nomS}" inconnue (crée-la d'abord dans l'onglet Structures, ou corrige le nom).`
+          );
+          return;
+        }
+        if (!idsStructures.includes(trouvee.id)) idsStructures.push(trouvee.id);
+      }
       emailsVus.add(emailLigne);
-      personnesValides.push({ full_name: nom, email: emailLigne, roles: [role as AppRole] });
+      personnesValides.push({
+        full_name: nom,
+        email: emailLigne,
+        roles: [role as AppRole],
+        structures: idsStructures,
+      });
     });
 
     setErreursImport(erreurs);
@@ -492,17 +607,28 @@ export default function Comptes() {
     if (!apercuImport || apercuImport.length === 0) return;
     setImportant(true);
     setMessageImport(null);
+    await enregistrerStructuresEnAttente(apercuImport);
 
     const { data, error } = await supabase.functions.invoke('create-user', {
-      body: { action: 'queue-invite', people: apercuImport },
+      body: {
+        action: 'queue-invite',
+        people: apercuImport.map((p) => ({ full_name: p.full_name, email: p.email, roles: p.roles })),
+      },
     });
     setImportant(false);
 
     if (error || data?.error) {
+      await annulerStructuresEnAttente(apercuImport.map((p) => p.email));
       const messageErreur = await extraireErreurFonction(error, data);
       setErreursImport((prev) => [...prev, messageErreur]);
       return;
     }
+
+    // Lignes refusées par le serveur (compte déjà existant, doublon...) :
+    // on n'y attache aucune structure en attente.
+    await annulerStructuresEnAttente(
+      (data?.erreurs ?? []).map((e: { email: string }) => e.email).filter(Boolean)
+    );
 
     const erreursServeur = (data?.erreurs ?? []).map(
       (e: { ligne: number; email: string; erreur: string }) =>
@@ -540,6 +666,10 @@ export default function Comptes() {
   }
 
   const personnesFiltrees = personnes.filter((p) => {
+    if (filtreStructure === 'aucune' && p.structures.length > 0) return false;
+    if (filtreStructure !== 'toutes' && filtreStructure !== 'aucune' && !p.structures.includes(filtreStructure)) {
+      return false;
+    }
     const texte = recherche.trim().toLowerCase();
     if (!texte) return true;
     return p.full_name.toLowerCase().includes(texte) || p.email.toLowerCase().includes(texte);
@@ -615,6 +745,29 @@ export default function Comptes() {
               </label>
             ))}
           </div>
+
+          {structuresDisponibles && (
+            <>
+              <label className="block text-sm text-muted mb-1">Structure(s)</label>
+              <div className="flex flex-col gap-1.5 mb-3">
+                {structures.length === 0 && (
+                  <p className="text-xs text-muted">
+                    Aucune structure pour le moment : crée-les dans l'onglet Structures.
+                  </p>
+                )}
+                {structures.map((s) => (
+                  <label key={s.id} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={structuresCreation.includes(s.id)}
+                      onChange={() => basculerStructureCreation(s.id)}
+                    />
+                    {s.name}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
 
           <label className="block text-sm text-muted mb-1">Activation du compte</label>
           <div className="flex flex-col gap-1.5 mb-4">
@@ -720,6 +873,7 @@ export default function Comptes() {
                 {apercuImport.map((p, i) => (
                   <li key={i}>
                     {p.full_name} — {p.email} — {LABELS[p.roles[0]]}
+                    {p.structures.length > 0 && ` — ${p.structures.map(nomStructure).join(', ')}`}
                   </li>
                 ))}
               </ul>
@@ -826,6 +980,22 @@ export default function Comptes() {
           className="w-full border border-border rounded px-3 py-2 mb-3 text-sm"
         />
       )}
+      {!loading && !error && personnes.length > 0 && structuresDisponibles && (
+        <select
+          value={filtreStructure}
+          onChange={(e) => setFiltreStructure(e.target.value)}
+          aria-label="Filtrer par structure"
+          className="w-full border border-border rounded px-3 py-2 mb-3 text-sm"
+        >
+          <option value="toutes">Toutes les structures</option>
+          <option value="aucune">Sans structure</option>
+          {structures.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+      )}
       {personnes.length > 0 && personnesFiltrees.length === 0 && (
         <p className="text-sm text-muted">Aucun compte ne correspond à cette recherche.</p>
       )}
@@ -863,6 +1033,18 @@ export default function Comptes() {
                       {LABELS[r]}
                     </span>
                   ))}
+                  {p.structures.map((id) => (
+                    <span key={id} className="text-xs border border-border text-muted rounded px-2 py-0.5">
+                      {nomStructure(id)}
+                    </span>
+                  ))}
+                  {structuresDisponibles &&
+                    p.structures.length === 0 &&
+                    (p.roles.includes('arbitre') || p.roles.includes('formateur')) && (
+                    <span className="text-xs text-card-yellow bg-card-yellow-bg rounded px-2 py-0.5">
+                      Sans structure
+                    </span>
+                  )}
                 </span>
               </span>
             </button>
@@ -885,6 +1067,34 @@ export default function Comptes() {
                     );
                   })}
                 </div>
+
+                {structuresDisponibles && (
+                  <div>
+                    <p className="text-xs text-muted mb-1">Structure(s)</p>
+                    <div className="flex flex-col gap-2">
+                      {structures.length === 0 && (
+                        <p className="text-xs text-muted">
+                          Aucune structure pour le moment : crée-les dans l'onglet Structures.
+                        </p>
+                      )}
+                      {structures.map((s) => {
+                        const actif = p.structures.includes(s.id);
+                        return (
+                          <label key={s.id} className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={actif}
+                              disabled={enregistrement}
+                              onChange={() => basculerStructure(p, s, actif)}
+                            />
+                            {s.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {erreurStructure && <p className="text-xs text-card-red mt-1">{erreurStructure}</p>}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-xs text-muted mb-1">Nom complet</label>

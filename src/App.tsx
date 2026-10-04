@@ -8,6 +8,7 @@ import ActiverCompte from './pages/ActiverCompte';
 import MonProfil from './pages/MonProfil';
 import AdminDashboard from './pages/admin/Dashboard';
 import Comptes from './pages/admin/Comptes';
+import Structures from './pages/admin/Structures';
 import Journal from './pages/admin/Journal';
 import Reglages from './pages/admin/Reglages';
 import FormateurDashboard from './pages/formateur/Dashboard';
@@ -58,6 +59,14 @@ export default function App() {
             element={
               <ProtectedRoute role="admin">
                 <Comptes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/structures"
+            element={
+              <ProtectedRoute role="admin">
+                <Structures />
               </ProtectedRoute>
             }
           />

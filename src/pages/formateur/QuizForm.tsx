@@ -77,8 +77,19 @@ export default function QuizForm() {
 
   useEffect(() => {
     async function charger() {
-      const { data: groupesData } = await supabase.from('groups').select('id, name').order('name');
-      setGroupes(groupesData ?? []);
+      // Le nom de la structure est ajouté à côté du nom du groupe (si la
+      // mise à jour SQL des structures a été exécutée dans Supabase).
+      const { data: structuresData, error: errStructures } = await supabase.from('structures').select('id, name');
+      const { data: groupesBruts } = await supabase
+        .from('groups')
+        .select(errStructures ? 'id, name' : 'id, name, structure_id')
+        .order('name');
+      setGroupes(
+        ((groupesBruts ?? []) as unknown as { id: string; name: string; structure_id?: string | null }[]).map((g) => {
+          const structure = (structuresData ?? []).find((s) => s.id === g.structure_id)?.name;
+          return { id: g.id, name: structure ? `${g.name} (${structure})` : g.name };
+        })
+      );
 
       if (id) {
         const { data: quiz, error } = await supabase

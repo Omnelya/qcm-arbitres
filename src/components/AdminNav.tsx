@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const liens = [
   { to: '/admin', label: "Vue d'ensemble", end: true },
   { to: '/admin/comptes', label: 'Comptes' },
+  { to: '/admin/structures', label: 'Structures' },
   { to: '/admin/journal', label: 'Journal' },
   { to: '/admin/reglages', label: 'Réglages' },
 ];
