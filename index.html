@@ -24,6 +24,43 @@
         }
       })();
     </script>
+    <script>
+      // Filet de sécurité : si l'application ne démarre pas (erreur de
+      // configuration, fichier introuvable...), on affiche un message
+      // lisible avec la cause technique, au lieu d'une page blanche.
+      (function () {
+        function afficher(detail) {
+          var racine = document.getElementById('root');
+          if (!racine || racine.hasChildNodes()) return;
+          var boite = document.createElement('div');
+          boite.style.cssText = 'max-width:28rem;margin:3rem auto;padding:0 1rem;font-family:system-ui,sans-serif';
+          var titre = document.createElement('p');
+          titre.style.fontWeight = '600';
+          titre.textContent = "L'application n'a pas pu démarrer.";
+          var aide = document.createElement('p');
+          aide.style.cssText = 'color:#6B6B64;font-size:14px';
+          aide.textContent = 'Recharge la page avec Ctrl+Maj+R (Cmd+Maj+R sur Mac). Si le problème continue, envoie ce message à l\'administrateur :';
+          var pre = document.createElement('pre');
+          pre.style.cssText = 'white-space:pre-wrap;font-size:12px;background:#F7F7F5;border:1px solid #E3E1DB;border-radius:8px;padding:8px';
+          pre.textContent = String(detail);
+          boite.appendChild(titre);
+          boite.appendChild(aide);
+          boite.appendChild(pre);
+          racine.appendChild(boite);
+        }
+        window.addEventListener('error', function (e) {
+          var cible = e.target;
+          if (cible && cible.tagName === 'SCRIPT') {
+            afficher('Fichier non chargé : ' + (cible.src || ''));
+          } else if (e.message) {
+            afficher(e.message);
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function (e) {
+          afficher(e.reason && e.reason.message ? e.reason.message : e.reason);
+        });
+      })();
+    </script>
   </head>
   <body class="bg-canvas text-ink font-sans antialiased">
     <div id="root"></div>
