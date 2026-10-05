@@ -94,6 +94,18 @@ export default function Confidentialite() {
         </section>
 
         <section>
+          <h2 className="font-semibold mb-1">Les vidéos des QCM</h2>
+          <p>
+            Les extraits de matchs de handball sont fournis par des clubs, la ligue et les Pôles Espoirs,
+            informés de leur usage pour la formation des arbitres. Ils montrent des matchs publics ; des
+            personnes mineures, arbitres ou joueurs, peuvent y apparaître. Ces vidéos ne sont visibles que
+            par les comptes connectés, servent uniquement à la formation et sont supprimées après la durée
+            de conservation fixée par l'administrateur. Si tu apparais sur une vidéo, toi ou ton enfant, et
+            souhaites son retrait, écris à l'adresse de contact.
+          </p>
+        </section>
+
+        <section>
           <h2 className="font-semibold mb-1">Combien de temps elles sont conservées</h2>
           <ul className="list-disc pl-5 space-y-1">
             <li>Tes données sont conservées tant que ton compte existe, résultats compris.</li>

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import FormateurNav from '../../components/FormateurNav';
+import RappelRgpdFormateur from '../../components/RappelRgpdFormateur';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -74,6 +75,7 @@ export default function FormateurDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [creation, setCreation] = useState(false);
+  const [rappelRgpdOuvert, setRappelRgpdOuvert] = useState(false);
 
   useEffect(() => {
     async function charger() {
@@ -171,12 +173,21 @@ export default function FormateurDashboard() {
 
   return (
     <AppLayout>
+      {rappelRgpdOuvert && (
+        <RappelRgpdFormateur
+          onAnnuler={() => setRappelRgpdOuvert(false)}
+          onConfirmer={() => {
+            setRappelRgpdOuvert(false);
+            creerNouveauQcm();
+          }}
+        />
+      )}
       <FormateurNav />
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">Mes QCM</h1>
         <button
           type="button"
-          onClick={creerNouveauQcm}
+          onClick={() => setRappelRgpdOuvert(true)}
           disabled={creation}
           className="text-sm border border-border rounded px-3 py-1.5 disabled:opacity-60"
         >
