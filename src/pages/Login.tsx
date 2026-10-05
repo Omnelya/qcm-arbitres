@@ -12,6 +12,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [motDePasseDefini, setMotDePasseDefini] = useState(false);
+  const [compteSupprime, setCompteSupprime] = useState(false);
   const [deconnecteInactivite, setDeconnecteInactivite] = useState(false);
 
   // Message d'explication après une déconnexion automatique.
@@ -31,9 +32,13 @@ export default function Login() {
   // réinitialisation de mot de passe (voir ActiverCompte.tsx), qui
   // redirige ici volontairement plutôt que de garder la personne connectée.
   useEffect(() => {
-    const etat = location.state as { motDePasseDefini?: boolean } | null;
+    const etat = location.state as { motDePasseDefini?: boolean; compteSupprime?: boolean } | null;
     if (etat?.motDePasseDefini) {
       setMotDePasseDefini(true);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+    if (etat?.compteSupprime) {
+      setCompteSupprime(true);
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -60,7 +65,13 @@ export default function Login() {
           </p>
         )}
 
-        {deconnecteInactivite && !motDePasseDefini && (
+        {compteSupprime && (
+          <p className="text-sm text-pitch-dark bg-pitch-light rounded px-3 py-2 mb-4">
+            Ton compte et tes données ont été supprimés.
+          </p>
+        )}
+
+        {deconnecteInactivite && !motDePasseDefini && !compteSupprime && (
           <p className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2 mb-4">
             Tu as été déconnecté après 5 minutes d'inactivité. Reconnecte-toi pour continuer.
           </p>
@@ -110,6 +121,9 @@ export default function Login() {
 
         <Link to="/mot-de-passe-oublie" className="block text-center text-sm text-muted underline mt-4">
           Mot de passe oublié ?
+        </Link>
+        <Link to="/confidentialite" className="block text-center text-sm text-muted underline mt-2">
+          Confidentialité et données personnelles
         </Link>
       </div>
     </div>

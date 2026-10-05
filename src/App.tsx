@@ -5,6 +5,7 @@ import RequireAuth from './components/RequireAuth';
 import Login from './pages/Login';
 import MotDePasseOublie from './pages/MotDePasseOublie';
 import ActiverCompte from './pages/ActiverCompte';
+import Confidentialite from './pages/Confidentialite';
 import MonProfil from './pages/MonProfil';
 import AdminDashboard from './pages/admin/Dashboard';
 import Comptes from './pages/admin/Comptes';
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
           <Route path="/activer-mon-compte" element={<ActiverCompte />} />
+          <Route path="/confidentialite" element={<Confidentialite />} />
           <Route
             path="/mon-profil"
             element={
