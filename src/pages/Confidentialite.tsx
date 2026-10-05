@@ -96,8 +96,8 @@ export default function Confidentialite() {
         <section>
           <h2 className="font-semibold mb-1">Les vidéos des QCM</h2>
           <p>
-            Les extraits de matchs de handball sont fournis par des clubs, la ligue et les Pôles Espoirs,
-            informés de leur usage pour la formation des arbitres. Ils montrent des matchs publics ; des
+            Les extraits de matchs de handball sont fournis par des clubs, la ligue, les Pôles Espoirs
+            ou tout autre organisme autorisant l'exploitation des images, informés de leur usage pour la formation des arbitres. Ils montrent des matchs publics ; des
             personnes mineures, arbitres ou joueurs, peuvent y apparaître. Ces vidéos ne sont visibles que
             par les comptes connectés, servent uniquement à la formation et sont supprimées après la durée
             de conservation fixée par l'administrateur. Si tu apparais sur une vidéo, toi ou ton enfant, et
