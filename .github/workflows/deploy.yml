@@ -17,6 +17,11 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    # Environnement GitHub Pages : requis par deploy-pages. Il est recréé
+    # automatiquement s'il a disparu (ex. dépôt passé en privé puis public).
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
