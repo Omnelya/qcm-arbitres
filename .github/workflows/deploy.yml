@@ -32,6 +32,18 @@ jobs:
       - name: Installer les dépendances
         run: npm ci
 
+      - name: Vérifier les secrets Supabase
+        # Sans ces deux secrets, le site se construit mais s'affiche en page
+        # blanche : on préfère arrêter le déploiement avec un message clair.
+        run: |
+          if [ -z "$VITE_SUPABASE_URL" ] || [ -z "$VITE_SUPABASE_ANON_KEY" ]; then
+            echo "::error::Secret manquant : VITE_SUPABASE_URL et/ou VITE_SUPABASE_ANON_KEY (GitHub > Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+
       - name: Construire le site
         run: npm run build
         env:
