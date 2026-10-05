@@ -126,7 +126,7 @@ Deno.serve(async (req: Request) => {
 
     const s3 = new S3Client({
       region: 'auto',
-      endpoint: `https://${Deno.env.get('R2_ACCOUNT_ID')}.r2.cloudflarestorage.com`,
+      endpoint: `https://${Deno.env.get('R2_ACCOUNT_ID')}${Deno.env.get('R2_JURISDICTION') ? '.' + Deno.env.get('R2_JURISDICTION') : ''}.r2.cloudflarestorage.com`,
       credentials: {
         accessKeyId: Deno.env.get('R2_ACCESS_KEY_ID')!,
         secretAccessKey: Deno.env.get('R2_SECRET_ACCESS_KEY')!,
