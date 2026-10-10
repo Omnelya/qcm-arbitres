@@ -3,9 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  /* Vert par défaut de l'application (#1F6F4A, #164F35, #E6F0EA). */
+  :root {
+    --pitch-rgb: 31 111 74;
+    --pitch-dark-rgb: 22 79 53;
+    --pitch-light-rgb: 230 240 234;
+    --sur-pitch: #ffffff;
+  }
+
   /* Zones tactiles confortables sur mobile, comme validé sur les maquettes. */
   button,
   input[type='submit'] {
     min-height: 44px;
   }
+}
+
+/* Texte posé sur la couleur principale : blanc par défaut, foncé si la
+   couleur de la structure est claire (ex. jaune). */
+.bg-pitch.text-white {
+  color: var(--sur-pitch);
 }

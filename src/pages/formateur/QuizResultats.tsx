@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import { supabase } from '../../lib/supabaseClient';
+import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 import { logActivity } from '../../lib/activityLog';
 
 interface LigneResultat {
@@ -16,6 +17,8 @@ interface LigneResultat {
 
 export default function QuizResultats() {
   const { id: quizId } = useParams();
+  // Éléments verts de l'écran aux couleurs de la structure du QCM
+  useCouleurStructureEcran(useStructuresQcm(quizId));
   const navigate = useNavigate();
   const location = useLocation();
   // Cet écran est accessible aussi bien par le formateur propriétaire que

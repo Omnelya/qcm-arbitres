@@ -11,10 +11,13 @@ export default {
         border: '#E3E1DB',
         muted: '#6B6B64',
         // Vert profond : couleur principale de l'application.
+        // Couleurs "vertes" de l'application, pilotées par des variables CSS
+        // (src/index.css) : sur les écrans d'un QCM, elles prennent la
+        // couleur de la structure du QCM (voir src/hooks/useCouleurQcm.ts).
         pitch: {
-          DEFAULT: '#1F6F4A',
-          dark: '#164F35',
-          light: '#E6F0EA',
+          DEFAULT: 'rgb(var(--pitch-rgb) / <alpha-value>)',
+          dark: 'rgb(var(--pitch-dark-rgb) / <alpha-value>)',
+          light: 'rgb(var(--pitch-light-rgb) / <alpha-value>)',
         },
         // Doré et rouge brique : clin d'œil aux cartons jaune/rouge de l'arbitrage,
         // utilisés pour les états d'avertissement et de danger.

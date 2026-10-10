@@ -133,3 +133,27 @@ export function styleBoutonStructures(
   const texte = couleurs.every((c) => couleurTexteSur(c) === BLANC) ? BLANC : ENCRE;
   return { background: `linear-gradient(90deg, ${bandes})`, color: texte, borderColor: couleurs[0] };
 }
+
+// --- Couleur principale de l'application aux couleurs d'une structure ----
+
+function versRgb(hex: string): [number, number, number] {
+  const h = couleurValide(hex);
+  return [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16)) as [number, number, number];
+}
+
+function melange(a: [number, number, number], b: [number, number, number], part: number) {
+  return a.map((v, i) => Math.round(v * (1 - part) + b[i] * part)).join(' ');
+}
+
+// Variables CSS qui remplacent le vert de l'application (classes
+// bg-pitch, text-pitch-dark, bg-pitch-light...) par la couleur donnée.
+export function variablesCouleur(couleur: string): Record<string, string> {
+  const rgb = versRgb(couleur);
+  return {
+    '--pitch-rgb': rgb.join(' '),
+    // Version foncée, lisible sur la version claire (étiquettes).
+    '--pitch-dark-rgb': melange(rgb, [0, 0, 0], 0.4),
+    '--pitch-light-rgb': melange(rgb, [255, 255, 255], 0.88),
+    '--sur-pitch': couleurTexteSur(couleur),
+  };
+}

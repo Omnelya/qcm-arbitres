@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import { supabase } from '../../lib/supabaseClient';
+import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 import { useSuspendreDeconnexionInactivite } from '../../lib/inactivite';
 import { extraireErreurFonction } from '../../lib/functionsError';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
@@ -51,6 +52,8 @@ function nouvelleOption(): AnswerOption {
 
 export default function QuizQuestions() {
   const { id: quizId } = useParams();
+  // Éléments verts de l'écran aux couleurs de la structure du QCM
+  useCouleurStructureEcran(useStructuresQcm(quizId));
 
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [statutQcm, setStatutQcm] = useState<'draft' | 'published' | null>(null);

@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import FormateurNav from '../../components/FormateurNav';
 import RappelRgpdFormateur from '../../components/RappelRgpdFormateur';
 import { supabase } from '../../lib/supabaseClient';
 import { BadgesStructures } from '../../components/BadgeStructure';
-import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
+import { chargerStructuresDesQcm, variablesCouleur, type Structure } from '../../lib/structures';
 import { useAuth } from '../../hooks/useAuth';
 
 interface QuizRow {
@@ -249,7 +249,11 @@ export default function FormateurDashboard() {
         {quizzesAffiches.map((q) => {
           const statut = STATUT[q.computed_status];
           return (
-            <li key={q.id} className="bg-surface border border-border rounded p-3">
+            <li
+              key={q.id}
+              className="bg-surface border border-border rounded p-3"
+              style={q.structures.length > 0 ? (variablesCouleur(q.structures[0].color) as CSSProperties) : undefined}
+            >
               <Link to={`/formateur/qcm/${q.id}`} className="block mb-2">
                 <div className="flex items-center justify-between mb-1 gap-2">
                   <span className="text-sm font-medium">{q.title}</span>

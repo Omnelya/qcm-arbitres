@@ -4,6 +4,7 @@ import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import { supabase } from '../../lib/supabaseClient';
 import BadgeStructure from '../../components/BadgeStructure';
+import { useCouleurStructureEcran } from '../../hooks/useCouleurQcm';
 import { chargerStructures, styleBoutonStructures, type Structure } from '../../lib/structures';
 import { logActivity } from '../../lib/activityLog';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
@@ -242,14 +243,6 @@ export default function QuizForm() {
     navigate(`/formateur/qcm/${nouveauId}`);
   }
 
-  if (loading) {
-    return (
-      <AppLayout>
-        <p className="text-sm text-muted">Chargement…</p>
-      </AppLayout>
-    );
-  }
-
   // Le bouton Publier prend la couleur de la structure des groupes cochés
   // (bandes de couleurs si plusieurs structures).
   const structuresCiblees = Array.from(
@@ -260,6 +253,18 @@ export default function QuizForm() {
     ).values()
   );
   const stylePublier = styleBoutonStructures(structuresCiblees);
+  // Dès qu'un groupe est coché, tous les éléments verts de cet écran
+  // prennent la couleur de sa structure.
+  useCouleurStructureEcran(structuresCiblees);
+
+  if (loading) {
+    return (
+      <AppLayout>
+        <p className="text-sm text-muted">Chargement…</p>
+      </AppLayout>
+    );
+  }
+
 
   return (
     <AppLayout>
