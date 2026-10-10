@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import ArbitreNav from '../../components/ArbitreNav';
 import { supabase } from '../../lib/supabaseClient';
+import { BadgesStructures } from '../../components/BadgeStructure';
+import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
 import { useAuth } from '../../hooks/useAuth';
 
 interface QuizDispo {
@@ -11,6 +13,7 @@ interface QuizDispo {
   time_limit_minutes: number;
   period_end: string | null;
   attempt: { statut: 'a_commencer' | 'en_cours'; started_at: string | null };
+  structures: Structure[];
 }
 
 function formatEcheance(d: string) {
@@ -63,6 +66,7 @@ export default function ArbitreAccueil() {
         : Promise.resolve({ data: [] as { id: string; period_end: string }[] }),
     ]);
 
+    const structuresParQuiz = await chargerStructuresDesQcm(ids);
     const echeanceParId = Object.fromEntries((periodsData ?? []).map((p) => [p.id, p.period_end]));
 
     const liste: QuizDispo[] = [];
@@ -78,6 +82,7 @@ export default function ArbitreAccueil() {
           statut: tentative ? 'en_cours' : 'a_commencer',
           started_at: tentative?.started_at ?? null,
         },
+        structures: structuresParQuiz[q.id] ?? [],
       });
     }
     setQuizzes(liste);
@@ -128,6 +133,7 @@ export default function ArbitreAccueil() {
           return (
             <li key={q.id} className="bg-surface border border-border rounded p-3">
               <p className="text-sm font-medium mb-1">{q.title}</p>
+              <BadgesStructures structures={q.structures} className="mb-1.5" />
               <p className="text-xs text-muted mb-0.5">{q.time_limit_minutes} minutes</p>
               {q.period_end && (
                 <p className={`text-xs mb-3 ${urgent ? 'text-card-red font-medium' : 'text-muted'}`}>

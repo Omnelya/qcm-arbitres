@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import ArbitreNav from '../../components/ArbitreNav';
 import { supabase } from '../../lib/supabaseClient';
+import { BadgesStructures } from '../../components/BadgeStructure';
+import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
 import { useAuth } from '../../hooks/useAuth';
 
 interface LigneHistorique {
@@ -11,6 +13,7 @@ interface LigneHistorique {
   titre: string;
   submitted_at: string;
   score: number | null;
+  structures: Structure[];
 }
 
 const OPTIONS_NOMBRE_QCM = [3, 5, 10] as const;
@@ -164,8 +167,11 @@ export default function Historique() {
         titres = Object.fromEntries((quizzesData ?? []).map((q) => [q.id, q.title]));
       }
 
+      const structuresParQuiz = await chargerStructuresDesQcm(quizIds);
+
       setLignes(
         (attempts ?? []).map((a) => ({
+          structures: structuresParQuiz[a.quiz_id] ?? [],
           attempt_id: a.id,
           quiz_id: a.quiz_id,
           titre: titres[a.quiz_id] ?? 'QCM',
@@ -211,6 +217,7 @@ export default function Historique() {
             >
               <div>
                 <p className="text-sm">{l.titre}</p>
+                <BadgesStructures structures={l.structures} className="my-1" />
                 <p className="text-xs text-muted">
                   Répondu le {new Date(l.submitted_at).toLocaleDateString('fr-FR')}
                 </p>

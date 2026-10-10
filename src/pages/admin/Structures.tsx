@@ -3,10 +3,62 @@ import AppLayout from '../../components/AppLayout';
 import AdminNav from '../../components/AdminNav';
 import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
+import {
+  chargerStructures,
+  PALETTE_STRUCTURES,
+  prochaineCouleur,
+  type Structure,
+} from '../../lib/structures';
+import BadgeStructure from '../../components/BadgeStructure';
 
-interface StructureRow {
-  id: string;
-  name: string;
+type StructureRow = Structure;
+
+// Choix d'une couleur : couleurs proposées + couleur libre.
+function ChoixCouleur({
+  valeur,
+  onChange,
+  idLibre,
+  desactive,
+}: {
+  valeur: string;
+  onChange: (c: string) => void;
+  idLibre: string;
+  desactive?: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="Couleur de la structure">
+      {PALETTE_STRUCTURES.map((p) => {
+        const choisie = p.valeur.toUpperCase() === valeur.toUpperCase();
+        return (
+          <button
+            key={p.valeur}
+            type="button"
+            role="radio"
+            aria-checked={choisie}
+            aria-label={p.nom}
+            title={p.nom}
+            disabled={desactive}
+            onClick={() => onChange(p.valeur)}
+            className={`w-7 h-7 min-h-0 p-0 shrink-0 rounded-full border-2 flex items-center justify-center leading-none disabled:opacity-50 ${choisie ? 'border-ink' : 'border-surface'}`}
+            style={{ backgroundColor: p.valeur, boxShadow: '0 0 0 1px #E3E1DB' }}
+          >
+            {choisie && <span className="text-white text-xs">✓</span>}
+          </button>
+        );
+      })}
+      <label htmlFor={idLibre} className="flex items-center gap-1 text-xs text-muted ml-1 cursor-pointer">
+        <input
+          id={idLibre}
+          type="color"
+          value={valeur}
+          disabled={desactive}
+          onChange={(e) => onChange(e.target.value.toUpperCase())}
+          className="w-7 h-7 p-0 border border-border rounded cursor-pointer bg-surface"
+        />
+        Autre
+      </label>
+    </div>
+  );
 }
 
 export default function Structures() {
@@ -17,6 +69,10 @@ export default function Structures() {
   const [erreur, setErreur] = useState<string | null>(null);
 
   const [nomNouvelle, setNomNouvelle] = useState('');
+  const [couleurNouvelle, setCouleurNouvelle] = useState<string | null>(null);
+  // false tant que la mise à jour SQL des couleurs n'a pas été exécutée
+  const [couleursDisponibles, setCouleursDisponibles] = useState(false);
+  const [couleurEnCours, setCouleurEnCours] = useState<string | null>(null);
   const [creation, setCreation] = useState(false);
   const [erreurCreation, setErreurCreation] = useState<string | null>(null);
 
@@ -29,8 +85,8 @@ export default function Structures() {
   async function charger() {
     setLoading(true);
     setErreur(null);
-    const [{ data: s, error: err1 }, { data: a }, { data: g }] = await Promise.all([
-      supabase.from('structures').select('id, name').order('name'),
+    const [{ structures: s, erreur: err1, couleurs }, { data: a }, { data: g }] = await Promise.all([
+      chargerStructures(),
       supabase.from('user_structures').select('user_id, structure_id'),
       supabase.from('groups').select('structure_id'),
     ]);
@@ -41,7 +97,8 @@ export default function Structures() {
       setLoading(false);
       return;
     }
-    setStructures(s ?? []);
+    setStructures(s);
+    setCouleursDisponibles(couleurs);
     setAffectations(a ?? []);
     setGroupes(g ?? []);
     setLoading(false);
@@ -64,13 +121,17 @@ export default function Structures() {
     if (!nom) return;
     setCreation(true);
     setErreurCreation(null);
-    const { error } = await supabase.from('structures').insert({ name: nom });
+    const couleur = couleurNouvelle ?? prochaineCouleur(structures.map((x) => x.color));
+    const { error } = await supabase
+      .from('structures')
+      .insert(couleursDisponibles ? { name: nom, color: couleur } : { name: nom });
     setCreation(false);
     if (error) {
       setErreurCreation(messageErreur(error.code, 'La création a échoué. Réessaie dans un instant.'));
       return;
     }
     setNomNouvelle('');
+    setCouleurNouvelle(null);
     await logActivity(`a créé la structure « ${nom} »`, 'structure');
     await charger();
   }
@@ -92,6 +153,22 @@ export default function Structures() {
     setRenommageId(null);
     await logActivity(`a renommé la structure « ${s.name} » en « ${nom} »`, 'structure', s.id);
     await charger();
+  }
+
+  async function changerCouleur(s: StructureRow, couleur: string) {
+    if (couleur.toUpperCase() === s.color.toUpperCase()) return;
+    setCouleurEnCours(s.id);
+    setErreurLigne(null);
+    // Affichage immédiat, puis enregistrement
+    setStructures((prev) => prev.map((x) => (x.id === s.id ? { ...x, color: couleur } : x)));
+    const { error } = await supabase.from('structures').update({ color: couleur }).eq('id', s.id);
+    setCouleurEnCours(null);
+    if (error) {
+      setErreurLigne({ id: s.id, message: "La couleur n'a pas pu être enregistrée. Réessaie dans un instant." });
+      await charger();
+      return;
+    }
+    await logActivity(`a changé la couleur de la structure « ${s.name} »`, 'structure', s.id);
   }
 
   async function supprimer(s: StructureRow) {
@@ -122,6 +199,8 @@ export default function Structures() {
       <p className="text-sm text-muted mb-4">
         Une structure regroupe les arbitres et formateurs d'une même entité. Un formateur ne voit que les
         arbitres de ses structures. L'affectation des personnes se fait dans l'onglet Comptes.
+        {couleursDisponibles &&
+          ' La couleur de chaque structure aide formateurs et arbitres à reconnaître ses QCM et ses groupes.'}
       </p>
 
       <form onSubmit={creer} className="flex gap-2 mb-2">
@@ -140,6 +219,16 @@ export default function Structures() {
           Créer
         </button>
       </form>
+      {couleursDisponibles && nomNouvelle.trim() && (
+        <div className="mb-2">
+          <p className="text-xs text-muted mb-1">Couleur de la nouvelle structure</p>
+          <ChoixCouleur
+            idLibre="couleur-nouvelle"
+            valeur={couleurNouvelle ?? prochaineCouleur(structures.map((x) => x.color))}
+            onChange={setCouleurNouvelle}
+          />
+        </div>
+      )}
       {erreurCreation && <p className="text-sm text-card-red mb-2">{erreurCreation}</p>}
 
       {loading && <p className="text-sm text-muted mt-4">Chargement…</p>}
@@ -178,11 +267,21 @@ export default function Structures() {
             ) : (
               <>
                 <div className="flex items-center justify-between mb-2 gap-2">
-                  <span className="text-sm font-medium">{s.name}</span>
+                  <BadgeStructure structure={s} className="text-sm font-medium" />
                   <span className="text-xs text-muted text-right">
                     {nombreComptes(s.id)} compte(s) · {nombreGroupes(s.id)} groupe(s)
                   </span>
                 </div>
+                {couleursDisponibles && (
+                  <div className="mb-3">
+                    <ChoixCouleur
+                      idLibre={`couleur-${s.id}`}
+                      valeur={s.color}
+                      desactive={couleurEnCours === s.id}
+                      onChange={(c) => changerCouleur(s, c)}
+                    />
+                  </div>
+                )}
                 <div className="flex gap-2">
                   <button
                     type="button"

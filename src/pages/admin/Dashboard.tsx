@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import AdminNav from '../../components/AdminNav';
 import { supabase } from '../../lib/supabaseClient';
+import { BadgesStructures } from '../../components/BadgeStructure';
+import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
 
 interface QuizVue {
   id: string;
@@ -13,6 +15,7 @@ interface QuizVue {
   cibles: number;
   period_start: string;
   period_end: string;
+  structures: Structure[];
 }
 
 function formatDateAffichage(dateIso: string): string {
@@ -75,6 +78,7 @@ export default function AdminDashboard() {
 
       const nomsFormateurs = Object.fromEntries((profils ?? []).map((p) => [p.id, p.full_name]));
 
+      const structuresParQuiz = await chargerStructuresDesQcm((quizzesData ?? []).map((q) => q.id));
       let totalNonRepondants = 0;
       let totalActifs = 0;
 
@@ -103,6 +107,7 @@ export default function AdminDashboard() {
           cibles: cibleIds.size,
           period_start: q.period_start,
           period_end: q.period_end,
+          structures: structuresParQuiz[q.id] ?? [],
         };
       });
 
@@ -251,6 +256,7 @@ export default function AdminDashboard() {
                     {statut.label}
                   </span>
                 </div>
+                <BadgesStructures structures={q.structures} className="mb-1.5" />
                 <p className="text-xs text-muted">
                   {q.formateur_nom} · {q.repondus}/{q.cibles} répondus
                 </p>

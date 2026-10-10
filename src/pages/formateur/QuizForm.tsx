@@ -3,6 +3,8 @@ import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import { supabase } from '../../lib/supabaseClient';
+import BadgeStructure from '../../components/BadgeStructure';
+import { chargerStructures, type Structure } from '../../lib/structures';
 import { logActivity } from '../../lib/activityLog';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
 import { useAuth } from '../../hooks/useAuth';
@@ -10,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 interface GroupRow {
   id: string;
   name: string;
+  structure: Structure | null;
 }
 
 function traduireErreur(message?: string): string {
@@ -79,15 +82,15 @@ export default function QuizForm() {
     async function charger() {
       // Le nom de la structure est ajouté à côté du nom du groupe (si la
       // mise à jour SQL des structures a été exécutée dans Supabase).
-      const { data: structuresData, error: errStructures } = await supabase.from('structures').select('id, name');
+      const { structures: structuresData, erreur: errStructures } = await chargerStructures();
       const { data: groupesBruts } = await supabase
         .from('groups')
         .select(errStructures ? 'id, name' : 'id, name, structure_id')
         .order('name');
       setGroupes(
         ((groupesBruts ?? []) as unknown as { id: string; name: string; structure_id?: string | null }[]).map((g) => {
-          const structure = (structuresData ?? []).find((s) => s.id === g.structure_id)?.name;
-          return { id: g.id, name: structure ? `${g.name} (${structure})` : g.name };
+          const structure = structuresData.find((s) => s.id === g.structure_id) ?? null;
+          return { id: g.id, name: g.name, structure };
         })
       );
 
@@ -372,6 +375,7 @@ export default function QuizForm() {
               onChange={() => basculerGroupe(g.id)}
             />
             {g.name}
+            {g.structure && <BadgeStructure structure={g.structure} />}
           </label>
         ))}
       </div>

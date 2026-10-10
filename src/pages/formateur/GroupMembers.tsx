@@ -3,6 +3,8 @@ import { Link, useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import FormateurNav from '../../components/FormateurNav';
 import { supabase } from '../../lib/supabaseClient';
+import BadgeStructure from '../../components/BadgeStructure';
+import { chargerStructures, type Structure } from '../../lib/structures';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
 
 interface ArbitreRow {
@@ -15,7 +17,7 @@ export default function GroupMembers() {
   const { id: groupId } = useParams();
 
   const [nomGroupe, setNomGroupe] = useState('');
-  const [nomStructure, setNomStructure] = useState<string | null>(null);
+  const [structureGroupe, setStructureGroupe] = useState<Structure | null>(null);
   // true = ancien groupe pas encore rattaché à une structure : ses
   // membres ne peuvent pas être modifiés tant que ce n'est pas fait.
   const [aRattacher, setARattacher] = useState(false);
@@ -35,9 +37,7 @@ export default function GroupMembers() {
 
       // Structures : si la mise à jour SQL n'a pas encore été exécutée
       // dans Supabase, on retombe sur le fonctionnement d'avant.
-      const { data: structuresData, error: errStructures } = await supabase
-        .from('structures')
-        .select('id, name');
+      const { structures: structuresData, erreur: errStructures } = await chargerStructures();
       const structuresDisponibles = !errStructures;
 
       const [{ data: groupeBrut, error: err1 }, { data: idsArbitres }, { data: membresActuels }] =
@@ -70,7 +70,7 @@ export default function GroupMembers() {
           setLoading(false);
           return;
         }
-        setNomStructure((structuresData ?? []).find((s) => s.id === groupe.structure_id)?.name ?? null);
+        setStructureGroupe(structuresData.find((s) => s.id === groupe.structure_id) ?? null);
         // Seuls les arbitres de la structure du groupe peuvent en faire partie.
         const { data: affectes } = await supabase
           .from('user_structures')
@@ -153,6 +153,7 @@ export default function GroupMembers() {
         ← Mes groupes
       </Link>
       <h1 className="text-lg font-semibold mb-1">{nomGroupe}</h1>
+      {structureGroupe && <BadgeStructure structure={structureGroupe} className="mb-2" />}
       {aRattacher ? (
         <p className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2">
           Ce groupe n'est rattaché à aucune structure. Retourne dans « Mes groupes » et rattache-le à une
@@ -161,7 +162,7 @@ export default function GroupMembers() {
       ) : (
         <>
           <p className="text-sm text-muted mb-4">
-            {nomStructure ? `Structure : ${nomStructure}. ` : ''}Coche les arbitres à inclure (
+            Coche les arbitres à inclure (
             {selection.size} sélectionné(s))
           </p>
 

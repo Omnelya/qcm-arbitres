@@ -6,6 +6,8 @@ import { extraireErreurFonction } from '../../lib/functionsError';
 import { logActivity } from '../../lib/activityLog';
 import { motDePasseValide, MESSAGE_REGLES_MOT_DE_PASSE } from '../../lib/motDePasse';
 import ReglesMotDePasse from '../../components/ReglesMotDePasse';
+import BadgeStructure from '../../components/BadgeStructure';
+import { chargerStructures, type Structure } from '../../lib/structures';
 import type { AppRole } from '../../hooks/useAuth';
 
 interface PersonneAvecRoles {
@@ -39,10 +41,7 @@ interface LigneImport {
   structures: string[];
 }
 
-interface StructureRow {
-  id: string;
-  name: string;
-}
+type StructureRow = Structure;
 
 interface InviteQueueRow {
   id: string;
@@ -69,6 +68,10 @@ const LIBELLES_TRI = {
   structure: 'Structure (A → Z)',
 } as const;
 type Tri = keyof typeof LIBELLES_TRI;
+
+function PastilleCouleur({ couleur }: { couleur: string }) {
+  return <span aria-hidden="true" className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: couleur }} />;
+}
 
 function formatDate(d: string) {
   return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -175,17 +178,17 @@ export default function Comptes() {
       { data: profils, error: err1 },
       { data: roleRows, error: err2 },
       { data: connexions },
-      { data: structuresData, error: errStructures },
+      { structures: structuresData, erreur: errStructures },
       { data: affectations },
     ] = await Promise.all([
       supabase.from('profiles').select('id, full_name, email, created_at').order('full_name'),
       supabase.from('user_roles').select('user_id, role'),
       supabase.rpc('admin_dernieres_connexions'),
-      supabase.from('structures').select('id, name').order('name'),
+      chargerStructures(),
       supabase.from('user_structures').select('user_id, structure_id'),
     ]);
     setStructuresDisponibles(!errStructures);
-    setStructures(structuresData ?? []);
+    setStructures(structuresData);
     // Si la fonction n'est pas disponible, on affiche simplement la liste
     // sans les dates de connexion plutôt que de bloquer la page.
     const connexionsParId: Record<string, string | null> = Object.fromEntries(
@@ -874,6 +877,7 @@ export default function Comptes() {
                       checked={structuresCreation.includes(s.id)}
                       onChange={() => basculerStructureCreation(s.id)}
                     />
+                    <PastilleCouleur couleur={s.color} />
                     {s.name}
                   </label>
                 ))}
@@ -1198,9 +1202,10 @@ export default function Comptes() {
                     </span>
                   ))}
                   {p.structures.map((id) => (
-                    <span key={id} className="text-xs border border-border text-muted rounded px-2 py-0.5">
-                      {nomStructure(id)}
-                    </span>
+                    <BadgeStructure
+                      key={id}
+                      structure={structures.find((s) => s.id === id) ?? { name: '—', color: '#6B6B64' }}
+                    />
                   ))}
                   {structuresDisponibles &&
                     p.structures.length === 0 &&
@@ -1315,7 +1320,8 @@ export default function Comptes() {
                               disabled={enregistrement}
                               onChange={() => basculerStructure(p, s, actif)}
                             />
-                            {s.name}
+                            <PastilleCouleur couleur={s.color} />
+                    {s.name}
                           </label>
                         );
                       })}

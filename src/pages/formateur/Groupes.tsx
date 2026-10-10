@@ -4,6 +4,8 @@ import AppLayout from '../../components/AppLayout';
 import FormateurNav from '../../components/FormateurNav';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
+import BadgeStructure from '../../components/BadgeStructure';
+import { chargerStructures, type Structure } from '../../lib/structures';
 
 interface GroupRow {
   id: string;
@@ -12,10 +14,7 @@ interface GroupRow {
   // null = groupe créé avant la mise en place des structures
   structure_id: string | null;
 }
-interface StructureRow {
-  id: string;
-  name: string;
-}
+type StructureRow = Structure;
 interface ProfilLeger {
   id: string;
   full_name: string;
@@ -57,16 +56,16 @@ export default function Groupes() {
     setLoading(true);
     setErreur(null);
 
-    const [{ data: structuresData, error: errStructures }, { data: affectationsData }] = await Promise.all([
-      supabase.from('structures').select('id, name').order('name'),
+    const [{ structures: structuresData, erreur: errStructures }, { data: affectationsData }] = await Promise.all([
+      chargerStructures(),
       supabase.from('user_structures').select('user_id, structure_id'),
     ]);
     const dispo = !errStructures;
     setStructuresDisponibles(dispo);
-    setStructures(structuresData ?? []);
+    setStructures(structuresData);
     setAffectations(affectationsData ?? []);
-    if (dispo && (structuresData ?? []).length === 1) {
-      setStructureNouveauGroupe(structuresData![0].id);
+    if (dispo && structuresData.length === 1) {
+      setStructureNouveauGroupe(structuresData[0].id);
     }
 
     const [
@@ -130,6 +129,10 @@ export default function Groupes() {
 
   function estPartageAvec(groupId: string, formateurId: string) {
     return partages.some((p) => p.group_id === groupId && p.shared_with_user_id === formateurId);
+  }
+
+  function structureDe(id: string | null) {
+    return id ? (structures.find((s) => s.id === id) ?? null) : null;
   }
 
   function nomStructure(id: string | null) {
@@ -317,10 +320,8 @@ export default function Groupes() {
             <div className="flex items-center justify-between mb-2 gap-2">
               <span className="text-sm font-medium">
                 {g.name}
-                {nomStructure(g.structure_id) && (
-                  <span className="ml-2 text-xs font-normal border border-border text-muted rounded px-2 py-0.5">
-                    {nomStructure(g.structure_id)}
-                  </span>
+                {structureDe(g.structure_id) && (
+                  <BadgeStructure structure={structureDe(g.structure_id)!} className="ml-2 align-middle" />
                 )}
               </span>
               <span className="text-xs text-muted shrink-0">{nombreMembres(g.id)} arbitre(s)</span>
@@ -473,10 +474,8 @@ export default function Groupes() {
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium">
                     {g.name}
-                    {nomStructure(g.structure_id) && (
-                      <span className="ml-2 text-xs font-normal border border-border text-muted rounded px-2 py-0.5">
-                        {nomStructure(g.structure_id)}
-                      </span>
+                    {structureDe(g.structure_id) && (
+                      <BadgeStructure structure={structureDe(g.structure_id)!} className="ml-2 align-middle" />
                     )}
                   </span>
                   <span className="text-xs text-muted">

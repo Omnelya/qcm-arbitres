@@ -4,6 +4,8 @@ import AppLayout from '../../components/AppLayout';
 import FormateurNav from '../../components/FormateurNav';
 import RappelRgpdFormateur from '../../components/RappelRgpdFormateur';
 import { supabase } from '../../lib/supabaseClient';
+import { BadgesStructures } from '../../components/BadgeStructure';
+import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
 import { useAuth } from '../../hooks/useAuth';
 
 interface QuizRow {
@@ -15,6 +17,8 @@ interface QuizRow {
   created_at: string;
   cibles: number;
   repondus: number;
+  // Structure(s) des groupes ciblés
+  structures: Structure[];
 }
 
 const STATUT: Record<QuizRow['computed_status'], { label: string; className: string }> = {
@@ -94,11 +98,12 @@ export default function FormateurDashboard() {
         return;
       }
 
-      const liste = (data ?? []) as Omit<QuizRow, 'cibles' | 'repondus'>[];
+      const liste = (data ?? []) as Omit<QuizRow, 'cibles' | 'repondus' | 'structures'>[];
       const quizIds = liste.map((q) => q.id);
 
       let cibleParQuiz: Record<string, number> = {};
       let reponduParQuiz: Record<string, number> = {};
+      const structuresParQuiz = await chargerStructuresDesQcm(liste.map((q) => q.id));
 
       if (quizIds.length > 0) {
         const [{ data: quizGroups }, { data: attempts }] = await Promise.all([
@@ -131,6 +136,7 @@ export default function FormateurDashboard() {
         ...q,
         cibles: cibleParQuiz[q.id] ?? 0,
         repondus: reponduParQuiz[q.id] ?? 0,
+        structures: structuresParQuiz[q.id] ?? [],
       }));
 
       setQuizzes(trierQuizzes(listeComplete));
@@ -138,6 +144,15 @@ export default function FormateurDashboard() {
     }
     charger();
   }, [session]);
+
+  const [filtreStructure, setFiltreStructure] = useState<string | null>(null);
+  // Structures présentes parmi mes QCM (pour le filtre)
+  const structuresDesQcm = Array.from(
+    new Map(quizzes.flatMap((q) => q.structures).map((s) => [s.id, s])).values()
+  ).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+  const quizzesAffiches = filtreStructure
+    ? quizzes.filter((q) => q.structures.some((s) => s.id === filtreStructure))
+    : quizzes;
 
   async function creerNouveauQcm() {
     if (!session) return;
@@ -201,8 +216,37 @@ export default function FormateurDashboard() {
         <p className="text-sm text-muted">Aucun QCM pour le moment.</p>
       )}
 
+      {structuresDesQcm.length > 1 && (
+        <div className="flex gap-1.5 flex-wrap mb-3" role="group" aria-label="Filtrer par structure">
+          <button
+            type="button"
+            onClick={() => setFiltreStructure(null)}
+            aria-pressed={filtreStructure === null}
+            className={`text-xs rounded px-2.5 py-1 border ${filtreStructure === null ? 'border-ink bg-surface font-medium' : 'border-border text-muted'}`}
+          >
+            Toutes
+          </button>
+          {structuresDesQcm.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setFiltreStructure(filtreStructure === s.id ? null : s.id)}
+              aria-pressed={filtreStructure === s.id}
+              className={`text-xs rounded px-2.5 py-1 border inline-flex items-center gap-1.5 ${filtreStructure === s.id ? 'font-medium' : 'text-muted'}`}
+              style={{
+                borderColor: filtreStructure === s.id ? s.color : undefined,
+                backgroundColor: filtreStructure === s.id ? `${s.color}14` : undefined,
+              }}
+            >
+              <span aria-hidden="true" className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+              {s.name}
+            </button>
+          ))}
+        </div>
+      )}
+
       <ul className="flex flex-col gap-2">
-        {quizzes.map((q) => {
+        {quizzesAffiches.map((q) => {
           const statut = STATUT[q.computed_status];
           return (
             <li key={q.id} className="bg-surface border border-border rounded p-3">
@@ -213,6 +257,7 @@ export default function FormateurDashboard() {
                     {statut.label}
                   </span>
                 </div>
+                <BadgesStructures structures={q.structures} className="mb-1.5" />
                 <p className="text-xs text-muted">
                   {formatDate(q.period_start)} → {formatDate(q.period_end)}
                   {q.computed_status !== 'draft' && ` · ${q.repondus}/${q.cibles} répondus`}
