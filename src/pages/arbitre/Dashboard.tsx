@@ -4,7 +4,7 @@ import AppLayout from '../../components/AppLayout';
 import ArbitreNav from '../../components/ArbitreNav';
 import { supabase } from '../../lib/supabaseClient';
 import { BadgesStructures } from '../../components/BadgeStructure';
-import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
+import { chargerStructuresDesQcm, styleBoutonStructures, type Structure } from '../../lib/structures';
 import { useAuth } from '../../hooks/useAuth';
 
 interface QuizDispo {
@@ -145,7 +145,8 @@ export default function ArbitreAccueil() {
                 <button
                   type="button"
                   onClick={() => setQuizPourInstructions(q)}
-                  className="w-full bg-pitch text-white font-medium rounded py-2 text-sm disabled:opacity-60"
+                  className="w-full bg-pitch text-white font-medium rounded py-2 text-sm border border-pitch disabled:opacity-60"
+                  style={styleBoutonStructures(q.structures)}
                 >
                   Commencer
                 </button>
@@ -153,7 +154,12 @@ export default function ArbitreAccueil() {
                 <button
                   type="button"
                   onClick={() => navigate(`/arbitre/qcm/${q.id}`)}
-                  className="w-full border border-pitch text-pitch font-medium rounded py-2 text-sm"
+                  className="w-full border-2 border-pitch text-pitch font-medium rounded py-2 text-sm"
+                  style={
+                    q.structures.length > 0
+                      ? { borderColor: q.structures[0].color, color: '#1A1D1B' }
+                      : undefined
+                  }
                 >
                   Reprendre
                 </button>
@@ -185,7 +191,8 @@ export default function ArbitreAccueil() {
                 type="button"
                 onClick={() => commencer(quizPourInstructions.id)}
                 disabled={demarrage === quizPourInstructions.id}
-                className="flex-1 bg-pitch text-white font-medium rounded py-2 text-sm disabled:opacity-60"
+                className="flex-1 bg-pitch text-white font-medium rounded py-2 text-sm border border-pitch disabled:opacity-60"
+                style={styleBoutonStructures(quizPourInstructions.structures)}
               >
                 {demarrage === quizPourInstructions.id ? 'Démarrage…' : 'Commencer maintenant'}
               </button>

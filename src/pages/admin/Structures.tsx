@@ -203,6 +203,17 @@ export default function Structures() {
           ' La couleur de chaque structure aide formateurs et arbitres à reconnaître ses QCM et ses groupes.'}
       </p>
 
+      {!loading && !erreur && !couleursDisponibles && (
+        <div className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2 mb-4">
+          <p className="font-medium mb-1">Le choix des couleurs n'est pas encore activé.</p>
+          <p>
+            Il faut d'abord exécuter une fois la mise à jour de la base de données : dans Supabase, menu SQL
+            Editor, colle le contenu du fichier <span className="font-mono text-xs">20261010090000_couleurs_structures.sql</span>{' '}
+            (dossier supabase/migrations du dépôt GitHub), puis clique sur Run. Recharge ensuite cette page.
+          </p>
+        </div>
+      )}
+
       <form onSubmit={creer} className="flex gap-2 mb-2">
         <input
           type="text"

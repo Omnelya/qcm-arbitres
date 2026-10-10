@@ -4,7 +4,7 @@ import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import { supabase } from '../../lib/supabaseClient';
 import BadgeStructure from '../../components/BadgeStructure';
-import { chargerStructures, type Structure } from '../../lib/structures';
+import { chargerStructures, styleBoutonStructures, type Structure } from '../../lib/structures';
 import { logActivity } from '../../lib/activityLog';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
 import { useAuth } from '../../hooks/useAuth';
@@ -250,6 +250,17 @@ export default function QuizForm() {
     );
   }
 
+  // Le bouton Publier prend la couleur de la structure des groupes cochés
+  // (bandes de couleurs si plusieurs structures).
+  const structuresCiblees = Array.from(
+    new Map(
+      groupes
+        .filter((g) => groupesSelectionnes.has(g.id) && g.structure)
+        .map((g) => [g.structure!.id, g.structure!])
+    ).values()
+  );
+  const stylePublier = styleBoutonStructures(structuresCiblees);
+
   return (
     <AppLayout>
       {popupPublication && (
@@ -438,7 +449,13 @@ export default function QuizForm() {
             type="button"
             disabled={enregistrement || !titre || !dateDebut || !dateFin}
             onClick={demanderPublication}
-            className="flex-1 bg-pitch text-white font-medium rounded py-2 text-sm disabled:opacity-60"
+            className="flex-1 bg-pitch text-white font-medium rounded py-2 text-sm border border-pitch disabled:opacity-60"
+            style={stylePublier}
+            title={
+              structuresCiblees.length > 0
+                ? `Structure(s) : ${structuresCiblees.map((s) => s.name).join(', ')}`
+                : undefined
+            }
           >
             Publier
           </button>

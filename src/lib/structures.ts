@@ -7,9 +7,10 @@ export interface Structure {
   color: string;
 }
 
-// Couleurs proposées à l'administrateur : bien distinctes entre elles et
-// assez foncées pour rester lisibles sur fond clair. Même ordre que la
-// migration SQL qui colore les structures déjà existantes.
+// Couleurs proposées à l'administrateur, bien distinctes entre elles. Les
+// 10 premières sont dans le même ordre que la migration SQL qui colore les
+// structures déjà existantes. Le texte posé dessus (boutons) passe
+// automatiquement en blanc ou en noir selon la couleur (voir couleurTexteSur).
 export const PALETTE_STRUCTURES = [
   { valeur: '#1F6F4A', nom: 'Vert' },
   { valeur: '#2563A6', nom: 'Bleu' },
@@ -21,6 +22,16 @@ export const PALETTE_STRUCTURES = [
   { valeur: '#5D6D2E', nom: 'Olive' },
   { valeur: '#D35400', nom: 'Orange' },
   { valeur: '#34495E', nom: 'Ardoise' },
+  { valeur: '#1A237E', nom: 'Indigo' },
+  { valeur: '#0288D1', nom: 'Bleu ciel' },
+  { valeur: '#00695C', nom: 'Sapin' },
+  { valeur: '#F9A825', nom: 'Jaune' },
+  { valeur: '#E91E63', nom: 'Rose' },
+  { valeur: '#4A148C', nom: 'Aubergine' },
+  { valeur: '#5D4037', nom: 'Chocolat' },
+  { valeur: '#7F1D1D', nom: 'Bordeaux' },
+  { valeur: '#607D8B', nom: 'Gris bleu' },
+  { valeur: '#212121', nom: 'Noir' },
 ];
 
 export const COULEUR_PAR_DEFAUT = PALETTE_STRUCTURES[0].valeur;
@@ -79,4 +90,46 @@ export async function chargerStructuresDesQcm(quizIds: string[]): Promise<Record
     });
   }
   return parQcm;
+}
+
+// --- Couleur des boutons selon la structure -------------------------------
+
+function luminance(hex: string): number {
+  const canal = (i: number) => {
+    const v = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * canal(1) + 0.7152 * canal(3) + 0.0722 * canal(5);
+}
+
+function contraste(a: number, b: number): number {
+  return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+}
+
+const BLANC = '#FFFFFF';
+const ENCRE = '#1A1D1B';
+
+// Texte blanc ou foncé, celui qui se lit le mieux sur cette couleur.
+export function couleurTexteSur(fond: string): string {
+  const l = luminance(couleurValide(fond));
+  return contraste(l, 1) >= contraste(l, luminance(ENCRE)) ? BLANC : ENCRE;
+}
+
+// Style d'un bouton principal (Publier, Commencer...) aux couleurs des
+// structures concernées : couleur pleine pour une structure, bandes
+// verticales pour plusieurs. undefined = pas de structure, le bouton
+// garde sa couleur habituelle.
+export function styleBoutonStructures(
+  structures: Pick<Structure, 'color'>[]
+): { background: string; color: string; borderColor: string } | undefined {
+  const couleurs = Array.from(new Set(structures.map((s) => couleurValide(s.color).toUpperCase())));
+  if (couleurs.length === 0) return undefined;
+  if (couleurs.length === 1) {
+    return { background: couleurs[0], color: couleurTexteSur(couleurs[0]), borderColor: couleurs[0] };
+  }
+  const part = 100 / couleurs.length;
+  const bandes = couleurs.map((c, i) => `${c} ${i * part}% ${(i + 1) * part}%`).join(', ');
+  // Texte blanc seulement s'il se lit bien sur toutes les bandes.
+  const texte = couleurs.every((c) => couleurTexteSur(c) === BLANC) ? BLANC : ENCRE;
+  return { background: `linear-gradient(90deg, ${bandes})`, color: texte, borderColor: couleurs[0] };
 }
