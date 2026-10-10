@@ -47,6 +47,10 @@ export default function QuizAttempt() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [erreurSelection, setErreurSelection] = useState<string | null>(null);
   const [tempsRestant, setTempsRestant] = useState(0);
+  // Durée totale accordée (secondes), pour la barre sous le minuteur
+  const [dureeTotale, setDureeTotale] = useState(0);
+  // Heure de fin de la période, si elle arrive avant la fin du temps imparti
+  const [finParPeriode, setFinParPeriode] = useState<number | null>(null);
   const [soumission, setSoumission] = useState(false);
   const [navigationEnCours, setNavigationEnCours] = useState(false);
   const [confirmationEnvoi, setConfirmationEnvoi] = useState(false);
@@ -86,7 +90,7 @@ export default function QuizAttempt() {
 
       const { data: quiz, error: errQuiz } = await supabase
         .from('quizzes')
-        .select('title, time_limit_minutes, show_expected_count')
+        .select('title, time_limit_minutes, show_expected_count, period_end')
         .eq('id', quizId)
         .single();
       if (errQuiz || !quiz) {
@@ -118,8 +122,16 @@ export default function QuizAttempt() {
       // Marge de 10s ajoutée au temps annoncé par le formateur (temps de
       // lecture du pop-up + chargement de la première question), à tenir
       // synchronisée avec la même marge côté serveur (submit_exam_attempt).
-      const limite =
+      // Fin = fin du temps imparti, ou fin de la période du QCM si elle
+      // arrive avant : les réponses déjà cochées sont alors envoyées
+      // automatiquement, l'arbitre ne peut plus rien modifier.
+      const finTemps =
         new Date(attempt.started_at).getTime() + quiz.time_limit_minutes * 60_000 + MARGE_DEMARRAGE_MS;
+      const finPeriode = quiz.period_end ? new Date(quiz.period_end).getTime() : Infinity;
+      const limite = Math.min(finTemps, finPeriode);
+      // Durée réellement disponible depuis le début (barre pleine au départ)
+      setDureeTotale((limite - new Date(attempt.started_at).getTime()) / 1000);
+      setFinParPeriode(finPeriode < finTemps ? finPeriode : null);
       if (Date.now() >= limite) {
         await soumettre(attempt.id);
         return;
@@ -303,9 +315,21 @@ export default function QuizAttempt() {
       <div className="h-1 bg-canvas rounded overflow-hidden mb-3">
         <div
           className={`h-full ${tempsCritique ? 'bg-card-red' : 'bg-pitch'}`}
-          style={{ width: `${((indexActuel + 1) / questions.length) * 100}%` }}
+          style={{
+            // Barre du temps restant : se réduit au fil des secondes
+            width: `${dureeTotale > 0 ? Math.min(100, (tempsRestant / dureeTotale) * 100) : 0}%`,
+            transition: 'width 1s linear',
+          }}
         />
       </div>
+
+      {finParPeriode && (
+        <p className="text-xs text-card-yellow bg-card-yellow-bg rounded px-3 py-2 mb-3">
+          La période de ce QCM se termine à{' '}
+          {new Date(finParPeriode).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} : tes
+          réponses déjà cochées seront alors envoyées automatiquement.
+        </p>
+      )}
 
       <div className="flex flex-wrap gap-1.5 mb-4">
         {questions.map((q, i) => {

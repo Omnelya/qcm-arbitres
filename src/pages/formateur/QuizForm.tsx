@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
@@ -61,6 +61,17 @@ export default function QuizForm() {
 
   const estPublie = statut === 'published';
 
+  // --- Enregistrement automatique (brouillon) ---------------------------
+  // Chaque modification de l'onglet Paramètres est enregistrée d'office,
+  // moins d'une seconde après la dernière frappe ou le dernier clic.
+  const [etatSauvegarde, setEtatSauvegarde] = useState<'aucun' | 'en_cours' | 'ok' | 'erreur'>('aucun');
+  const [messageSauvegarde, setMessageSauvegarde] = useState<string | null>(null);
+  const derniereCleSauvee = useRef<string | null>(null);
+  const derniersGroupesSauves = useRef<string | null>(null);
+  const minuteurSauvegarde = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const sauvegardeEnAttente = useRef<(() => Promise<void>) | null>(null);
+  const modificationJournalisee = useRef(false);
+
   useEffect(() => {
     const etat = location.state as { justSaved?: boolean; justPublished?: boolean } | null;
     if (etat?.justPublished) {
@@ -119,11 +130,139 @@ export default function QuizForm() {
 
         const { data: qg } = await supabase.from('quiz_groups').select('group_id').eq('quiz_id', id);
         setGroupesSelectionnes(new Set((qg ?? []).map((r) => r.group_id)));
+        derniersGroupesSauves.current = (qg ?? []).map((r) => r.group_id).sort().join(',');
       }
       setLoading(false);
     }
     charger();
   }, [id]);
+
+  async function sauvegarderAutomatiquement(valeurs: {
+    titre: string;
+    dureeMinutes: number;
+    afficherScore: boolean;
+    afficherCorrection: boolean;
+    afficherNombreAttendu: boolean;
+    dateDebut: string;
+    dateFin: string;
+    groupes: string[];
+    cle: string;
+  }) {
+    if (!id) return;
+    if (!valeurs.titre.trim()) {
+      setEtatSauvegarde('erreur');
+      setMessageSauvegarde('Donne un titre au QCM pour que les modifications soient enregistrées.');
+      return;
+    }
+    if (!valeurs.dateDebut || !valeurs.dateFin || !(valeurs.dureeMinutes >= 1)) {
+      setEtatSauvegarde('erreur');
+      setMessageSauvegarde('Renseigne la durée et les deux dates pour que les modifications soient enregistrées.');
+      return;
+    }
+    setEtatSauvegarde('en_cours');
+    setMessageSauvegarde(null);
+
+    const { error } = await supabase
+      .from('quizzes')
+      .update({
+        title: valeurs.titre,
+        time_limit_minutes: valeurs.dureeMinutes,
+        show_score: valeurs.afficherScore,
+        show_correction: valeurs.afficherCorrection,
+        show_expected_count: valeurs.afficherNombreAttendu,
+        period_start: new Date(valeurs.dateDebut).toISOString(),
+        period_end: new Date(valeurs.dateFin).toISOString(),
+      })
+      .eq('id', id);
+    if (error) {
+      setEtatSauvegarde('erreur');
+      setMessageSauvegarde(traduireErreur(error.message));
+      return;
+    }
+
+    // Groupes ciblés : resynchronisés seulement s'ils ont changé.
+    const cleGroupes = [...valeurs.groupes].sort().join(',');
+    if (cleGroupes !== derniersGroupesSauves.current) {
+      const { error: errDelete } = await avecRetriesTimeout(() =>
+        supabase.from('quiz_groups').delete().eq('quiz_id', id)
+      );
+      const { error: errInsert } =
+        !errDelete && valeurs.groupes.length > 0
+          ? await supabase
+              .from('quiz_groups')
+              .insert(valeurs.groupes.map((groupId) => ({ quiz_id: id, group_id: groupId })))
+          : { error: errDelete };
+      if (errDelete || errInsert) {
+        setEtatSauvegarde('erreur');
+        setMessageSauvegarde("Les groupes destinataires n'ont pas pu être enregistrés. Réessaie dans un instant.");
+        return;
+      }
+      derniersGroupesSauves.current = cleGroupes;
+    }
+
+    derniereCleSauvee.current = valeurs.cle;
+    setEtatSauvegarde('ok');
+    // Une seule ligne dans le journal par visite de la page.
+    if (!modificationJournalisee.current) {
+      modificationJournalisee.current = true;
+      await logActivity(`a modifié le QCM « ${valeurs.titre} »`, 'quiz', id);
+    }
+  }
+
+  // Déclenche l'enregistrement après chaque modification (brouillon
+  // uniquement : un QCM publié n'est plus modifiable).
+  useEffect(() => {
+    if (loading || !id || estPublie || statut === null) return;
+    const valeurs = {
+      titre,
+      dureeMinutes,
+      afficherScore,
+      afficherCorrection,
+      afficherNombreAttendu,
+      dateDebut,
+      dateFin,
+      groupes: Array.from(groupesSelectionnes),
+    };
+    const cle = JSON.stringify({ ...valeurs, groupes: [...valeurs.groupes].sort() });
+    // Premier passage après le chargement : rien n'a encore été modifié.
+    if (derniereCleSauvee.current === null) {
+      derniereCleSauvee.current = cle;
+      return;
+    }
+    if (cle === derniereCleSauvee.current) return;
+
+    if (minuteurSauvegarde.current) clearTimeout(minuteurSauvegarde.current);
+    const lancer = () => sauvegarderAutomatiquement({ ...valeurs, cle });
+    sauvegardeEnAttente.current = lancer;
+    minuteurSauvegarde.current = setTimeout(() => {
+      minuteurSauvegarde.current = null;
+      sauvegardeEnAttente.current = null;
+      lancer();
+    }, 700);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    loading,
+    statut,
+    titre,
+    dureeMinutes,
+    afficherScore,
+    afficherCorrection,
+    afficherNombreAttendu,
+    dateDebut,
+    dateFin,
+    groupesSelectionnes,
+  ]);
+
+  // En quittant la page (onglet Questions, retour...) : la dernière
+  // modification encore en attente est enregistrée tout de suite.
+  useEffect(() => {
+    return () => {
+      if (minuteurSauvegarde.current) clearTimeout(minuteurSauvegarde.current);
+      const enAttente = sauvegardeEnAttente.current;
+      sauvegardeEnAttente.current = null;
+      if (enAttente) enAttente();
+    };
+  }, []);
 
   function basculerGroupe(groupId: string) {
     setGroupesSelectionnes((prev) => {
@@ -136,6 +275,11 @@ export default function QuizForm() {
 
   async function enregistrer(nouveauStatut: 'draft' | 'published') {
     if (!session) return;
+    // La publication enregistre tous les paramètres : l'enregistrement
+    // automatique en attente devient inutile.
+    if (minuteurSauvegarde.current) clearTimeout(minuteurSauvegarde.current);
+    minuteurSauvegarde.current = null;
+    sauvegardeEnAttente.current = null;
     setErreur(null);
     setEnregistrement(true);
 
@@ -165,6 +309,7 @@ export default function QuizForm() {
       setEnregistrement(false);
       return;
     }
+    setStatut(nouveauStatut);
     await logActivity(`a modifié le QCM « ${titre} »`, 'quiz', id);
 
     // Resynchronise les groupes cibles : on efface puis on réinsère,
@@ -441,15 +586,16 @@ export default function QuizForm() {
       )}
 
       {!estPublie && (
-        <div className="flex gap-2 mb-3">
-          <button
-            type="button"
-            disabled={enregistrement || !titre || !dateDebut || !dateFin}
-            onClick={() => enregistrer('draft')}
-            className="flex-1 border border-border rounded py-2 text-sm disabled:opacity-60"
+        <div className="flex flex-col gap-2 mb-3">
+          <p
+            className={`text-xs ${etatSauvegarde === 'erreur' ? 'text-card-red' : 'text-muted'}`}
+            aria-live="polite"
           >
-            Enregistrer le brouillon
-          </button>
+            {etatSauvegarde === 'en_cours' && 'Enregistrement…'}
+            {etatSauvegarde === 'ok' && '✓ Modifications enregistrées automatiquement'}
+            {etatSauvegarde === 'aucun' && 'Les modifications sont enregistrées automatiquement.'}
+            {etatSauvegarde === 'erreur' && messageSauvegarde}
+          </p>
           <button
             type="button"
             disabled={enregistrement || !titre || !dateDebut || !dateFin}
