@@ -32,7 +32,12 @@ export default function Groupes() {
   // structuresDisponibles = false tant que la mise à jour SQL des
   // structures n'a pas été exécutée dans Supabase : la page fonctionne
   // alors comme avant.
+  // structures = UNIQUEMENT celles auxquelles le formateur appartient
+  // (création et rattachement de groupes). Un compte à la fois admin et
+  // formateur voit toutes les structures en base : on ne s'en sert ici que
+  // pour afficher l'étiquette d'un groupe partagé.
   const [structures, setStructures] = useState<StructureRow[]>([]);
+  const [toutesStructures, setToutesStructures] = useState<StructureRow[]>([]);
   const [structuresDisponibles, setStructuresDisponibles] = useState(false);
   const [affectations, setAffectations] = useState<{ user_id: string; structure_id: string }[]>([]);
   const [structureNouveauGroupe, setStructureNouveauGroupe] = useState('');
@@ -62,10 +67,16 @@ export default function Groupes() {
     ]);
     const dispo = !errStructures;
     setStructuresDisponibles(dispo);
-    setStructures(structuresData);
+    const mesIds = new Set(
+      (affectationsData ?? []).filter((a) => a.user_id === session?.user.id).map((a) => a.structure_id)
+    );
+    const miennes = structuresData.filter((s) => mesIds.has(s.id));
+    setToutesStructures(structuresData);
+    setStructures(miennes);
     setAffectations(affectationsData ?? []);
-    if (dispo && structuresData.length === 1) {
-      setStructureNouveauGroupe(structuresData[0].id);
+    // Une seule structure : elle est choisie d'office, sans question.
+    if (dispo && miennes.length === 1) {
+      setStructureNouveauGroupe(miennes[0].id);
     }
 
     const [
@@ -132,12 +143,7 @@ export default function Groupes() {
   }
 
   function structureDe(id: string | null) {
-    return id ? (structures.find((s) => s.id === id) ?? null) : null;
-  }
-
-  function nomStructure(id: string | null) {
-    if (!id) return null;
-    return structures.find((s) => s.id === id)?.name ?? null;
+    return id ? (toutesStructures.find((s) => s.id === id) ?? null) : null;
   }
 
   // Formateurs avec qui un groupe peut être partagé : ceux de la
@@ -286,13 +292,16 @@ export default function Groupes() {
               ))}
             </select>
           )}
+          {structuresDisponibles && structures.length === 1 && (
+            <p className="text-xs text-muted mb-2 flex items-center gap-1.5 flex-wrap">
+              Nouveau groupe dans la structure <BadgeStructure structure={structures[0]} />
+            </p>
+          )}
           <div className="flex gap-2">
             <input
               type="text"
               placeholder={
-                structuresDisponibles && structures.length === 1
-                  ? `Nom du nouveau groupe (${structures[0].name})`
-                  : 'Nom du nouveau groupe'
+                'Nom du nouveau groupe'
               }
               value={nomNouveauGroupe}
               onChange={(e) => setNomNouveauGroupe(e.target.value)}
@@ -503,7 +512,7 @@ export default function Groupes() {
                   </ul>
                 )}
 
-                {structuresDisponibles && !nomStructure(g.structure_id) ? (
+                {structuresDisponibles && !structures.some((s) => s.id === g.structure_id) ? (
                   <p className="text-xs text-muted">
                     Duplication impossible : ce groupe n'est pas rattaché à l'une de tes structures.
                   </p>
