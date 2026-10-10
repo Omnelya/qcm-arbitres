@@ -26,7 +26,8 @@ function formatDateAffichage(dateIso: string): string {
 const STATUT: Record<QuizVue['computed_status'], { label: string; className: string }> = {
   draft: { label: 'Brouillon', className: 'bg-canvas text-muted' },
   a_venir: { label: 'À venir', className: 'bg-card-yellow-bg text-card-yellow' },
-  actif: { label: 'Actif', className: 'bg-pitch-light text-pitch-dark' },
+  // Toujours vert, quelle que soit la couleur de la structure du QCM.
+  actif: { label: 'Actif', className: 'bg-[#E6F0EA] text-[#164F35]' },
   expire: { label: 'Expiré', className: 'bg-card-red-bg text-card-red' },
 };
 

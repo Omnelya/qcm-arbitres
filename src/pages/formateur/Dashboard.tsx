@@ -1,11 +1,11 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import FormateurNav from '../../components/FormateurNav';
 import RappelRgpdFormateur from '../../components/RappelRgpdFormateur';
 import { supabase } from '../../lib/supabaseClient';
 import { BadgesStructures } from '../../components/BadgeStructure';
-import { chargerStructuresDesQcm, variablesCouleur, type Structure } from '../../lib/structures';
+import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
 import { useAuth } from '../../hooks/useAuth';
 
 interface QuizRow {
@@ -24,7 +24,8 @@ interface QuizRow {
 const STATUT: Record<QuizRow['computed_status'], { label: string; className: string }> = {
   draft: { label: 'Brouillon', className: 'bg-canvas text-muted' },
   a_venir: { label: 'À venir', className: 'bg-card-yellow-bg text-card-yellow' },
-  actif: { label: 'Actif', className: 'bg-pitch-light text-pitch-dark' },
+  // Toujours vert, quelle que soit la couleur de la structure du QCM.
+  actif: { label: 'Actif', className: 'bg-[#E6F0EA] text-[#164F35]' },
   expire: { label: 'Expiré', className: 'bg-card-red-bg text-card-red' },
 };
 
@@ -249,11 +250,7 @@ export default function FormateurDashboard() {
         {quizzesAffiches.map((q) => {
           const statut = STATUT[q.computed_status];
           return (
-            <li
-              key={q.id}
-              className="bg-surface border border-border rounded p-3"
-              style={q.structures.length > 0 ? (variablesCouleur(q.structures[0].color) as CSSProperties) : undefined}
-            >
+            <li key={q.id} className="bg-surface border border-border rounded p-3">
               <Link to={`/formateur/qcm/${q.id}`} className="block mb-2">
                 <div className="flex items-center justify-between mb-1 gap-2">
                   <span className="text-sm font-medium">{q.title}</span>

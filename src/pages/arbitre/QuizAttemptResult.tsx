@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import { supabase } from '../../lib/supabaseClient';
+import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 
 interface LigneDetail {
   question_id: string;
@@ -63,6 +64,8 @@ function statutOption(o: OptionAffichee): { classe: string; label: string | null
 
 export default function QuizAttemptResult() {
   const { id: quizId, attemptId } = useParams();
+  // Couleurs de l'écran aux couleurs de la structure du QCM
+  useCouleurStructureEcran(useStructuresQcm(quizId));
   const [titre, setTitre] = useState('');
   const [showScore, setShowScore] = useState(false);
   const [showCorrection, setShowCorrection] = useState(false);

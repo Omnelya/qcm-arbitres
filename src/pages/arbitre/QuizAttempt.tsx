@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import { supabase } from '../../lib/supabaseClient';
+import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
 import { useAuth } from '../../hooks/useAuth';
 import { useSuspendreDeconnexionInactivite } from '../../lib/inactivite';
@@ -27,6 +28,8 @@ export default function QuizAttempt() {
   // propre limite de temps).
   useSuspendreDeconnexionInactivite(true);
   const { id: quizId } = useParams();
+  // Couleurs de l'écran aux couleurs de la structure du QCM
+  useCouleurStructureEcran(useStructuresQcm(quizId));
   const { session } = useAuth();
   const navigate = useNavigate();
 
