@@ -41,6 +41,8 @@ export default function QuizResultats() {
   const [relanceEnCours, setRelanceEnCours] = useState(false);
   const [messageRelance, setMessageRelance] = useState<{ ok: boolean; texte: string } | null>(null);
   const [relancesDisponibles, setRelancesDisponibles] = useState(false);
+  // Arbitres cochés pour la relance (tous par défaut, décochables un à un)
+  const [selectionRelance, setSelectionRelance] = useState<Set<string>>(new Set());
 
   async function charger() {
     if (!quizId) return;
@@ -151,7 +153,7 @@ export default function QuizResultats() {
     setRelanceEnCours(true);
     setMessageRelance(null);
     const { data, error } = await supabase.functions.invoke('notify-quiz-published', {
-      body: { quizId, relance: true, userIds: aRelancer.map((l) => l.id) },
+      body: { quizId, relance: true, userIds: Array.from(selectionRelance) },
     });
     setRelanceEnCours(false);
     setConfirmationRelance(false);
@@ -353,6 +355,7 @@ export default function QuizResultats() {
                 type="button"
                 onClick={() => {
                   setMessageRelance(null);
+                  setSelectionRelance(new Set(aRelancer.map((l) => l.id)));
                   setConfirmationRelance(true);
                 }}
                 className="w-full bg-pitch text-white font-medium rounded py-2 text-sm"
@@ -362,12 +365,44 @@ export default function QuizResultats() {
             )
           ) : (
             <div>
-              <p className="text-sm mb-1">
-                Un e-mail de rappel sera envoyé à {aRelancer.length} arbitre(s) :
-              </p>
-              <p className="text-xs text-muted mb-3">
-                {aRelancer.map((l) => l.full_name).join(', ')}
-              </p>
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <p className="text-sm">Décoche les arbitres à ne pas relancer :</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setSelectionRelance(
+                      selectionRelance.size === aRelancer.length ? new Set() : new Set(aRelancer.map((l) => l.id))
+                    )
+                  }
+                  className="text-xs text-muted underline shrink-0 min-h-0"
+                >
+                  {selectionRelance.size === aRelancer.length ? 'Tout décocher' : 'Tout cocher'}
+                </button>
+              </div>
+              <ul className="flex flex-col gap-1.5 mb-3 max-h-60 overflow-y-auto">
+                {aRelancer.map((l) => (
+                  <li key={l.id}>
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectionRelance.has(l.id)}
+                        onChange={() =>
+                          setSelectionRelance((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(l.id)) next.delete(l.id);
+                            else next.add(l.id);
+                            return next;
+                          })
+                        }
+                      />
+                      <span className="flex-1 min-w-0">{l.full_name}</span>
+                      <span className="text-xs text-muted shrink-0">
+                        {l.statut === 'en_cours' ? 'commencé, pas terminé' : 'pas commencé'}
+                      </span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
               <div className="flex gap-2">
                 <button
                   type="button"
@@ -380,10 +415,10 @@ export default function QuizResultats() {
                 <button
                   type="button"
                   onClick={envoyerRelance}
-                  disabled={relanceEnCours}
+                  disabled={relanceEnCours || selectionRelance.size === 0}
                   className="flex-1 bg-pitch text-white font-medium rounded py-2 text-sm disabled:opacity-60"
                 >
-                  {relanceEnCours ? 'Envoi…' : 'Envoyer la relance'}
+                  {relanceEnCours ? 'Envoi…' : `Relancer ${selectionRelance.size} arbitre(s)`}
                 </button>
               </div>
             </div>
