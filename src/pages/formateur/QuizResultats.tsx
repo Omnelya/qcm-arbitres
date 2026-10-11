@@ -40,6 +40,7 @@ export default function QuizResultats() {
   const [confirmationRelance, setConfirmationRelance] = useState(false);
   const [relanceEnCours, setRelanceEnCours] = useState(false);
   const [messageRelance, setMessageRelance] = useState<{ ok: boolean; texte: string } | null>(null);
+  const [relancesDisponibles, setRelancesDisponibles] = useState(false);
 
   async function charger() {
     if (!quizId) return;
@@ -59,13 +60,18 @@ export default function QuizResultats() {
     setTitre(quiz.title);
     setPeriode({ statut: quiz.status, debut: quiz.period_start, fin: quiz.period_end });
     // Dernière relance (table absente tant que la mise à jour SQL n'est pas faite)
-    const { data: relances } = await supabase
+    const { data: relances, error: errRelances } = await supabase
       .from('quiz_relances')
       .select('sent_at, recipients')
       .eq('quiz_id', quizId)
       .order('sent_at', { ascending: false })
       .limit(1);
     setDerniereRelance(relances?.[0] ?? null);
+    // Le bouton n'apparaît qu'une fois la mise à jour SQL faite : c'est la
+    // dernière étape de l'installation, après la mise à jour de la fonction
+    // d'envoi des mails (sinon l'ancienne fonction enverrait le mail de
+    // publication à TOUS les arbitres).
+    setRelancesDisponibles(!errRelances);
 
     const { data: quizGroups } = await supabase.from('quiz_groups').select('group_id').eq('quiz_id', quizId);
     const groupIds = (quizGroups ?? []).map((g) => g.group_id);
@@ -339,7 +345,7 @@ export default function QuizResultats() {
 
       {erreur && <p className="text-sm text-card-red mb-4">{erreur}</p>}
 
-      {qcmEnCours && (aRelancer.length > 0 || messageRelance) && (
+      {relancesDisponibles && qcmEnCours && (aRelancer.length > 0 || messageRelance) && (
         <div className="bg-surface border border-border rounded p-3 mb-4">
           {!confirmationRelance ? (
             aRelancer.length > 0 && (
