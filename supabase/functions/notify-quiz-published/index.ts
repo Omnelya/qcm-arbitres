@@ -1,6 +1,12 @@
 // Fonction Supabase Edge Function : envoie un e-mail de notification à tous
 // les arbitres des groupes ciblés par un QCM, au moment de sa publication.
 //
+// v0.8.0 — Relance : avec { quizId, relance: true } (bouton « Relancer par
+// e-mail » de l'onglet Résultats), le mail n'est envoyé qu'aux arbitres qui
+// n'ont pas encore envoyé leur copie, pendant la période du QCM uniquement,
+// au plus une fois toutes les 10 minutes. Option { userIds: [...] } pour ne
+// relancer que certains arbitres. Réservé au créateur du QCM ou à l'admin.
+//
 // Contrairement aux mails de Comptes.tsx (invite-user, magic-link, etc.),
 // ce mail n'est PAS un mail d'authentification Supabase : il est envoyé
 // directement par SMTP (Gmail) depuis cette fonction, avec ses propres
@@ -50,13 +56,23 @@ function formaterDateHeure(iso: string): string {
   return `${date} à ${heure}`;
 }
 
-function construireEmailHtml(prenom: string, titreQuiz: string, periodStart: string, periodEnd: string): string {
+function construireEmailHtml(
+  prenom: string,
+  titreQuiz: string,
+  periodStart: string,
+  periodEnd: string,
+  relance = false
+): string {
+  const titre = relance ? 'Rappel : un QCM t\'attend' : 'Un nouveau QCM t\'attend';
+  const texte = relance
+    ? `Bonjour ${prenom},<br/><br/>Tu n'as pas encore répondu au QCM « <strong>${titreQuiz}</strong> ». Il reste accessible jusqu'au <strong>${formaterDateHeure(periodEnd)}</strong> : pense à le faire avant cette date.`
+    : `Bonjour ${prenom},<br/><br/>Le QCM « <strong>${titreQuiz}</strong> » vient d'être mis à ta disposition sur QCM Arbitres. Il sera accessible du <strong>${formaterDateHeure(periodStart)}</strong> au <strong>${formaterDateHeure(periodEnd)}</strong>.`;
   return `<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Nouveau QCM — QCM Arbitres</title>
+<title>${titre} — QCM Arbitres</title>
 </head>
 <body style="margin:0;padding:0;background:#F7F7F5;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F7F7F5;padding:32px 16px;font-family:Inter,-apple-system,'Segoe UI',Arial,sans-serif;">
@@ -78,11 +94,11 @@ function construireEmailHtml(prenom: string, titreQuiz: string, periodStart: str
 
         <tr><td style="padding:30px 40px 6px;text-align:center;">
           <p style="margin:0 0 6px;font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:#C99A2E;font-weight:700;font-family:Inter,Arial,sans-serif;">Ballon en main</p>
-          <h1 style="margin:0 0 14px;font-size:21px;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">Un nouveau QCM t'attend</h1>
+          <h1 style="margin:0 0 14px;font-size:21px;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">${titre}</h1>
         </td></tr>
 
         <tr><td style="padding:0 40px 30px;text-align:center;">
-          <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">Bonjour ${prenom},<br/><br/>Le QCM « <strong>${titreQuiz}</strong> » vient d'être mis à ta disposition sur QCM Arbitres. Il sera accessible du <strong>${formaterDateHeure(periodStart)}</strong> au <strong>${formaterDateHeure(periodEnd)}</strong>.</p>
+          <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">${texte}</p>
           <a href="${SITE_URL}/login" style="display:inline-block;background:#C99A2E;color:#1A1D1B;text-decoration:none;font-size:15px;font-weight:700;padding:12px 32px;border-radius:24px;font-family:Inter,Arial,sans-serif;">Se connecter</a>
         </td></tr>
 
@@ -100,7 +116,8 @@ function construireEmailHtml(prenom: string, titreQuiz: string, periodStart: str
 async function envoyerVersDestinataires(
   transport: ReturnType<typeof nodemailer.createTransport>,
   destinataires: { email: string; full_name: string }[],
-  quiz: { title: string; period_start: string; period_end: string }
+  quiz: { title: string; period_start: string; period_end: string },
+  relance = false
 ) {
   for (const dest of destinataires) {
     try {
@@ -109,8 +126,8 @@ async function envoyerVersDestinataires(
           {
             from: `"QCM Arbitres" <${Deno.env.get('SMTP_USERNAME')}>`,
             to: dest.email,
-            subject: `Nouveau QCM disponible : ${quiz.title}`,
-            html: construireEmailHtml(dest.full_name, quiz.title, quiz.period_start, quiz.period_end),
+            subject: relance ? `Rappel : QCM à faire — ${quiz.title}` : `Nouveau QCM disponible : ${quiz.title}`,
+            html: construireEmailHtml(dest.full_name, quiz.title, quiz.period_start, quiz.period_end, relance),
           },
           (error: Error | null) => (error ? reject(error) : resolve())
         );
@@ -155,9 +172,12 @@ Deno.serve(async (req: Request) => {
     if (!roleRows || roleRows.length === 0) {
       return json({ error: 'Réservé aux formateurs et administrateurs.' }, 403);
     }
+    const estAdmin = roleRows.some((r) => r.role === 'admin');
 
     const body = await req.json();
     const quizId = body.quizId as string | undefined;
+    const relance = body.relance === true;
+    const userIdsDemandes = Array.isArray(body.userIds) ? (body.userIds as string[]) : null;
     if (!quizId) {
       return json({ error: 'quizId requis.' }, 400);
     }
@@ -169,7 +189,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: quiz, error: quizErr } = await supabaseAdmin
       .from('quizzes')
-      .select('id, title, status, period_start, period_end')
+      .select('id, title, status, period_start, period_end, formateur_id')
       .eq('id', quizId)
       .single();
 
@@ -178,6 +198,26 @@ Deno.serve(async (req: Request) => {
     }
     if (quiz.status !== 'published') {
       return json({ error: "Ce QCM n'est pas publié." }, 400);
+    }
+    // Seul le créateur du QCM (ou l'admin) peut envoyer des mails à ses arbitres.
+    if (!estAdmin && quiz.formateur_id !== userData.user.id) {
+      return json({ error: "Seul le créateur de ce QCM peut prévenir ses arbitres." }, 403);
+    }
+    if (relance) {
+      const maintenant = Date.now();
+      if (maintenant < new Date(quiz.period_start).getTime() || maintenant >= new Date(quiz.period_end).getTime()) {
+        return json({ error: "Relance impossible : le QCM n'est pas dans sa période d'accès." }, 400);
+      }
+      const { data: derniere } = await supabaseAdmin
+        .from('quiz_relances')
+        .select('sent_at')
+        .eq('quiz_id', quizId)
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (derniere && maintenant - new Date(derniere.sent_at).getTime() < 10 * 60_000) {
+        return json({ error: 'Une relance vient déjà d\'être envoyée. Attends 10 minutes avant la suivante.' }, 429);
+      }
     }
 
     const { data: qg } = await supabaseAdmin.from('quiz_groups').select('group_id').eq('quiz_id', quizId);
@@ -190,7 +230,26 @@ Deno.serve(async (req: Request) => {
       .from('group_members')
       .select('user_id')
       .in('group_id', groupIds);
-    const userIds = Array.from(new Set((membres ?? []).map((r) => r.user_id)));
+    let userIds = Array.from(new Set((membres ?? []).map((r) => r.user_id)));
+
+    if (relance) {
+      // Seulement ceux qui n'ont pas encore envoyé leur copie (copie en
+      // cours comprise : elle n'est pas terminée).
+      const { data: copiesEnvoyees } = await supabaseAdmin
+        .from('quiz_attempts')
+        .select('user_id')
+        .eq('quiz_id', quizId)
+        .in('status', ['submitted', 'auto_submitted']);
+      const ontRepondu = new Set((copiesEnvoyees ?? []).map((r) => r.user_id));
+      userIds = userIds.filter((u) => !ontRepondu.has(u));
+      if (userIdsDemandes) {
+        const demandes = new Set(userIdsDemandes);
+        userIds = userIds.filter((u) => demandes.has(u));
+      }
+      if (userIds.length === 0) {
+        return json({ started: false, recipients: 0, message: 'Tous les arbitres concernés ont déjà répondu.' }, 200);
+      }
+    }
     if (userIds.length === 0) {
       return json({ started: false, recipients: 0, message: 'Aucun arbitre dans ces groupes.' }, 200);
     }
@@ -218,7 +277,13 @@ Deno.serve(async (req: Request) => {
     // continue en tâche de fond. Voir les logs de cette fonction dans le
     // dashboard Supabase pour suivre les envois/échecs individuels — il n'y
     // a pas de statut renvoyé au formateur au-delà de ce message initial.
-    EdgeRuntime.waitUntil(envoyerVersDestinataires(transport, destinataires, quiz));
+    if (relance) {
+      await supabaseAdmin
+        .from('quiz_relances')
+        .insert({ quiz_id: quizId, sent_by: userData.user.id, recipients: destinataires.length });
+    }
+
+    EdgeRuntime.waitUntil(envoyerVersDestinataires(transport, destinataires, quiz, relance));
 
     return json({ started: true, recipients: destinataires.length }, 200);
   } catch (_e) {

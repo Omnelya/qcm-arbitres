@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import { supabase } from '../../lib/supabaseClient';
+import { extraireErreurFonction } from '../../lib/functionsError';
 import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 import { logActivity } from '../../lib/activityLog';
 
@@ -33,6 +34,12 @@ export default function QuizResultats() {
   const [confirmationSuppression, setConfirmationSuppression] = useState(false);
   const [suppression, setSuppression] = useState(false);
   const [exportEnCours, setExportEnCours] = useState<'excel' | 'csv' | null>(null);
+  // --- Relance par e-mail des arbitres qui n'ont pas répondu ---
+  const [periode, setPeriode] = useState<{ statut: string; debut: string; fin: string } | null>(null);
+  const [derniereRelance, setDerniereRelance] = useState<{ sent_at: string; recipients: number } | null>(null);
+  const [confirmationRelance, setConfirmationRelance] = useState(false);
+  const [relanceEnCours, setRelanceEnCours] = useState(false);
+  const [messageRelance, setMessageRelance] = useState<{ ok: boolean; texte: string } | null>(null);
 
   async function charger() {
     if (!quizId) return;
@@ -41,7 +48,7 @@ export default function QuizResultats() {
 
     const { data: quiz, error: errQuiz } = await supabase
       .from('quizzes')
-      .select('title')
+      .select('title, status, period_start, period_end')
       .eq('id', quizId)
       .single();
     if (errQuiz || !quiz) {
@@ -50,6 +57,15 @@ export default function QuizResultats() {
       return;
     }
     setTitre(quiz.title);
+    setPeriode({ statut: quiz.status, debut: quiz.period_start, fin: quiz.period_end });
+    // Dernière relance (table absente tant que la mise à jour SQL n'est pas faite)
+    const { data: relances } = await supabase
+      .from('quiz_relances')
+      .select('sent_at, recipients')
+      .eq('quiz_id', quizId)
+      .order('sent_at', { ascending: false })
+      .limit(1);
+    setDerniereRelance(relances?.[0] ?? null);
 
     const { data: quizGroups } = await supabase.from('quiz_groups').select('group_id').eq('quiz_id', quizId);
     const groupIds = (quizGroups ?? []).map((g) => g.group_id);
@@ -116,6 +132,38 @@ export default function QuizResultats() {
   }, [quizId]);
 
   const repondus = lignes.filter((l) => l.statut === 'soumis');
+  const aRelancer = lignes.filter((l) => l.statut !== 'soumis');
+  const maintenant = Date.now();
+  const qcmEnCours =
+    periode !== null &&
+    periode.statut === 'published' &&
+    maintenant >= new Date(periode.debut).getTime() &&
+    maintenant < new Date(periode.fin).getTime();
+
+  async function envoyerRelance() {
+    if (!quizId) return;
+    setRelanceEnCours(true);
+    setMessageRelance(null);
+    const { data, error } = await supabase.functions.invoke('notify-quiz-published', {
+      body: { quizId, relance: true, userIds: aRelancer.map((l) => l.id) },
+    });
+    setRelanceEnCours(false);
+    setConfirmationRelance(false);
+    if (error || data?.error) {
+      setMessageRelance({ ok: false, texte: await extraireErreurFonction(error, data) });
+      return;
+    }
+    if (!data?.started) {
+      setMessageRelance({ ok: true, texte: data?.message ?? 'Aucun e-mail à envoyer.' });
+      return;
+    }
+    setMessageRelance({
+      ok: true,
+      texte: `Relance en cours d'envoi à ${data.recipients} arbitre(s) (environ 2 secondes par e-mail).`,
+    });
+    setDerniereRelance({ sent_at: new Date().toISOString(), recipients: data.recipients });
+    await logActivity(`a relancé ${data.recipients} arbitre(s) pour le QCM « ${titre} »`, 'quiz', quizId);
+  }
   const scoreMoyen =
     repondus.length > 0
       ? repondus.reduce((s, l) => s + (l.score ?? 0), 0) / repondus.length
@@ -290,6 +338,69 @@ export default function QuizResultats() {
       </p>
 
       {erreur && <p className="text-sm text-card-red mb-4">{erreur}</p>}
+
+      {qcmEnCours && (aRelancer.length > 0 || messageRelance) && (
+        <div className="bg-surface border border-border rounded p-3 mb-4">
+          {!confirmationRelance ? (
+            aRelancer.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMessageRelance(null);
+                  setConfirmationRelance(true);
+                }}
+                className="w-full bg-pitch text-white font-medium rounded py-2 text-sm"
+              >
+                Relancer par e-mail les {aRelancer.length} arbitre(s) qui n'ont pas répondu
+              </button>
+            )
+          ) : (
+            <div>
+              <p className="text-sm mb-1">
+                Un e-mail de rappel sera envoyé à {aRelancer.length} arbitre(s) :
+              </p>
+              <p className="text-xs text-muted mb-3">
+                {aRelancer.map((l) => l.full_name).join(', ')}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setConfirmationRelance(false)}
+                  disabled={relanceEnCours}
+                  className="flex-1 border border-border rounded py-2 text-sm disabled:opacity-60"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={envoyerRelance}
+                  disabled={relanceEnCours}
+                  className="flex-1 bg-pitch text-white font-medium rounded py-2 text-sm disabled:opacity-60"
+                >
+                  {relanceEnCours ? 'Envoi…' : 'Envoyer la relance'}
+                </button>
+              </div>
+            </div>
+          )}
+          {messageRelance && (
+            <p className={`text-xs mt-2 ${messageRelance.ok ? 'text-pitch-dark' : 'text-card-red'}`}>
+              {messageRelance.texte}
+            </p>
+          )}
+          {derniereRelance && (
+            <p className="text-xs text-muted mt-2">
+              Dernière relance le{' '}
+              {new Date(derniereRelance.sent_at).toLocaleString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+              })}{' '}
+              ({derniereRelance.recipients} arbitre(s))
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="flex gap-2 mb-1">
         <button
