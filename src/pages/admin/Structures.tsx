@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import AppLayout from '../../components/AppLayout';
-import AdminNav from '../../components/AdminNav';
 import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
 import {
@@ -194,7 +193,6 @@ export default function Structures() {
 
   return (
     <AppLayout>
-      <AdminNav />
       <h1 className="text-lg font-semibold mb-1">Structures</h1>
       <p className="text-sm text-muted mb-4">
         Une structure regroupe les arbitres et formateurs d'une même entité. Un formateur ne voit que les

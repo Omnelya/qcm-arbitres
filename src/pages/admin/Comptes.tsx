@@ -1,6 +1,6 @@
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useLocation } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
-import AdminNav from '../../components/AdminNav';
 import { supabase } from '../../lib/supabaseClient';
 import { extraireErreurFonction } from '../../lib/functionsError';
 import { logActivity } from '../../lib/activityLog';
@@ -107,10 +107,13 @@ export default function Comptes() {
   // alors comme avant, sans rien afficher sur les structures.
   const [structures, setStructures] = useState<StructureRow[]>([]);
   const [structuresDisponibles, setStructuresDisponibles] = useState(false);
-  const [filtreStructure, setFiltreStructure] = useState('toutes');
+  // Filtre ou tri demandé depuis la vue d'ensemble (« À traiter »)
+  const etatArrivee = useLocation().state as { filtreStructure?: string; tri?: Tri } | null;
+  const [filtreStructure, setFiltreStructure] = useState(etatArrivee?.filtreStructure ?? 'toutes');
   const [filtreRole, setFiltreRole] = useState<'tous' | 'aucun' | AppRole>('tous');
   // Le tri choisi est mémorisé dans le navigateur d'une visite à l'autre.
   const [tri, setTri] = useState<Tri>(() => {
+    if (etatArrivee?.tri) return etatArrivee.tri;
     try {
       const memorise = localStorage.getItem('qcm-comptes-tri');
       return memorise && memorise in LIBELLES_TRI ? (memorise as Tri) : 'nom-az';
@@ -799,7 +802,6 @@ export default function Comptes() {
 
   return (
     <AppLayout>
-      <AdminNav />
       <div className="flex items-center justify-between mb-4 gap-2">
         <h1 className="text-lg font-semibold">Comptes</h1>
         <div className="flex gap-2">

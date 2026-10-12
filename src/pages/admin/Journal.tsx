@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import AppLayout from '../../components/AppLayout';
-import AdminNav from '../../components/AdminNav';
 import { supabase } from '../../lib/supabaseClient';
 
 interface LigneJournal {
@@ -86,7 +85,6 @@ export default function Journal() {
 
   return (
     <AppLayout>
-      <AdminNav />
       <h1 className="text-lg font-semibold mb-4">Journal d'activité</h1>
 
       <label className="block text-xs text-muted mb-1">Filtrer par personne</label>

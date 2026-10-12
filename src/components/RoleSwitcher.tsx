@@ -15,7 +15,7 @@ export default function RoleSwitcher() {
 
   // Rôle unique : simple étiquette, pas besoin de bascule cliquable.
   if (roles.length === 1) {
-    return <span className="text-sm font-medium text-ink">{LABELS[roles[0]]}</span>;
+    return <span className="text-sm font-medium">{LABELS[roles[0]]}</span>;
   }
 
   function handleChange(role: AppRole) {

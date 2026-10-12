@@ -21,6 +21,14 @@ export default {
         },
         // Doré et rouge brique : clin d'œil aux cartons jaune/rouge de l'arbitrage,
         // utilisés pour les états d'avertissement et de danger.
+        // Tableau de marque de l'espace administrateur
+        nuit: {
+          DEFAULT: '#0F2E21',
+          clair: '#1A4532',
+          craie: '#E6EFE9',
+        },
+        or: '#E0A526',
+        terrain: '#F2F4F1',
         card: {
           yellow: '#C99A2E',
           'yellow-bg': '#FBF3E2',
@@ -30,6 +38,9 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Espace administrateur (maquette A « Table de marque »)
+        admin: ['"Source Sans 3"', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
       },
       borderRadius: {
         DEFAULT: '10px',

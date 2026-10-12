@@ -1,6 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import AppLayout from '../../components/AppLayout';
-import AdminNav from '../../components/AdminNav';
 import { supabase } from '../../lib/supabaseClient';
 
 export default function Reglages() {
@@ -123,7 +122,6 @@ export default function Reglages() {
   if (loading) {
     return (
       <AppLayout>
-        <AdminNav />
         <p className="text-sm text-muted">Chargement…</p>
       </AppLayout>
     );
@@ -131,7 +129,6 @@ export default function Reglages() {
 
   return (
     <AppLayout>
-      <AdminNav />
       <h1 className="text-lg font-semibold mb-4">Réglages</h1>
 
       <p className="text-sm font-medium mb-2">Usage Cloudflare R2 ce mois-ci</p>
