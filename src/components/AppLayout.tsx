@@ -54,13 +54,19 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               QCM Arbitres
               <span className="block font-admin font-normal text-xs opacity-70 mt-1">{sousTitre}</span>
             </p>
-            <button onClick={() => signOut()} className="md:hidden text-sm underline opacity-80 min-h-0">
-              Déconnexion
-            </button>
+            <span className="md:hidden flex gap-3 text-sm">
+              <Link to="/mon-profil" className="underline opacity-80">
+                Mon profil
+              </Link>
+              <button onClick={() => signOut()} className="underline opacity-80 min-h-0">
+                Déconnexion
+              </button>
+            </span>
           </div>
+          {/* Choix du profil (rôle), dans l'encart vert en haut */}
+          <RoleSwitcher sombre />
           <MenuEspace liens={liens} titre={menu} />
           <div className="hidden md:flex md:mt-auto flex-col gap-2 text-sm">
-            <RoleSwitcher />
             <span className="opacity-70">{profile?.full_name}</span>
             <Link to="/mon-profil" className="underline opacity-80">
               Mon profil
@@ -71,12 +77,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           </div>
         </aside>
         <div className="flex-1 min-w-0">
-          <div className="md:hidden flex items-center justify-between gap-3 px-4 pt-3">
-            <RoleSwitcher />
-            <Link to="/mon-profil" className="text-sm text-muted underline ml-auto">
-              Mon profil
-            </Link>
-          </div>
           <main className="max-w-5xl px-4 md:px-8 py-6">{children}</main>
           <footer className="max-w-5xl px-4 md:px-8 pb-6">
             <Link to="/confidentialite" className="text-xs text-muted underline">
