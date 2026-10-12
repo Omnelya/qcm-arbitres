@@ -1,7 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
-import FormateurNav from '../../components/FormateurNav';
 import { supabase } from '../../lib/supabaseClient';
 import { useAuth } from '../../hooks/useAuth';
 import BadgeStructure from '../../components/BadgeStructure';
@@ -254,7 +253,6 @@ export default function Groupes() {
   if (loading) {
     return (
       <AppLayout>
-        <FormateurNav />
         <p className="text-sm text-muted">Chargement…</p>
       </AppLayout>
     );
@@ -266,7 +264,6 @@ export default function Groupes() {
 
   return (
     <AppLayout>
-      <FormateurNav />
       <h1 className="text-lg font-semibold mb-4">Mes groupes</h1>
       {erreur && <p className="text-sm text-card-red mb-4">{erreur}</p>}
 

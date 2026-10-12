@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
-import ArbitreNav from '../../components/ArbitreNav';
 import { supabase } from '../../lib/supabaseClient';
 import { BadgesStructures } from '../../components/BadgeStructure';
 import { chargerStructuresDesQcm, styleBoutonStructures, type Structure } from '../../lib/structures';
@@ -119,7 +118,6 @@ export default function ArbitreAccueil() {
 
   return (
     <AppLayout>
-      <ArbitreNav />
       <h1 className="text-lg font-semibold mb-4">Mes QCM à faire</h1>
       {erreur && <p className="text-sm text-card-red mb-4">{erreur}</p>}
 

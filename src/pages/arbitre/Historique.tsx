@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
-import ArbitreNav from '../../components/ArbitreNav';
 import { supabase } from '../../lib/supabaseClient';
 import { BadgesStructures } from '../../components/BadgeStructure';
 import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
@@ -187,7 +186,6 @@ export default function Historique() {
   if (loading) {
     return (
       <AppLayout>
-        <ArbitreNav />
         <p className="text-sm text-muted">Chargement…</p>
       </AppLayout>
     );
@@ -195,7 +193,6 @@ export default function Historique() {
 
   return (
     <AppLayout>
-      <ArbitreNav />
       <h1 className="text-lg font-semibold mb-1">Historique</h1>
       {retentionJours !== null && (
         <p className="text-xs text-muted mb-4">

@@ -24,8 +24,8 @@
   color: var(--sur-pitch);
 }
 
-/* Espace administrateur : titres de page en caractères « tableau de marque ». */
-.zone-admin h1 {
+/* Espaces admin, formateur, arbitre : titres de page en caractères « tableau de marque ». */
+.zone-app h1 {
   font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
   font-size: 2rem;
   line-height: 1.05;

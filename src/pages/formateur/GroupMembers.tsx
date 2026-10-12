@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
-import FormateurNav from '../../components/FormateurNav';
 import { supabase } from '../../lib/supabaseClient';
 import BadgeStructure from '../../components/BadgeStructure';
 import { chargerStructures, type Structure } from '../../lib/structures';
@@ -140,7 +139,6 @@ export default function GroupMembers() {
   if (loading) {
     return (
       <AppLayout>
-        <FormateurNav />
         <p className="text-sm text-muted">Chargement…</p>
       </AppLayout>
     );
@@ -148,7 +146,6 @@ export default function GroupMembers() {
 
   return (
     <AppLayout>
-      <FormateurNav />
       <Link to="/formateur/groupes" className="text-sm text-muted underline mb-3 inline-block">
         ← Mes groupes
       </Link>

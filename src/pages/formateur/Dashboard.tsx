@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
-import FormateurNav from '../../components/FormateurNav';
 import RappelRgpdFormateur from '../../components/RappelRgpdFormateur';
 import { supabase } from '../../lib/supabaseClient';
 import { BadgesStructures } from '../../components/BadgeStructure';
@@ -198,7 +197,6 @@ export default function FormateurDashboard() {
           }}
         />
       )}
-      <FormateurNav />
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold">Mes QCM</h1>
         <button

@@ -1,28 +1,64 @@
 import { type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import AdminNav from './AdminNav';
+import MenuEspace, { type LienMenu } from './MenuEspace';
+import type { AppRole } from '../hooks/useAuth';
 import { useAuth } from '../hooks/useAuth';
 import RoleSwitcher from './RoleSwitcher';
 
+// Menu et sous-titre de chaque espace
+const ESPACES: Record<AppRole, { sousTitre: string; menu: string; liens: LienMenu[] }> = {
+  admin: {
+    sousTitre: 'Administration',
+    menu: 'Menu administrateur',
+    liens: [
+      { to: '/admin', label: "Vue d'ensemble", end: true },
+      { to: '/admin/comptes', label: 'Comptes' },
+      { to: '/admin/structures', label: 'Structures' },
+      { to: '/admin/journal', label: 'Journal' },
+      { to: '/admin/reglages', label: 'Réglages' },
+    ],
+  },
+  formateur: {
+    sousTitre: 'Espace formateur',
+    menu: 'Menu formateur',
+    liens: [
+      { to: '/formateur', label: 'Mes QCM', end: true },
+      { to: '/formateur/groupes', label: 'Mes groupes' },
+    ],
+  },
+  arbitre: {
+    sousTitre: 'Espace arbitre',
+    menu: 'Menu arbitre',
+    liens: [
+      { to: '/arbitre', label: 'Mes QCM', end: true },
+      { to: '/arbitre/historique', label: 'Historique' },
+    ],
+  },
+};
+
 export default function AppLayout({ children }: { children: ReactNode }) {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, activeRole } = useAuth();
   const { pathname } = useLocation();
 
-  // Espace administrateur : barre latérale « tableau de marque » (maquette A).
-  if (pathname.startsWith('/admin')) {
+  // Barre latérale « tableau de marque » (maquette A) pour les trois
+  // espaces. Les pages communes (Mon profil...) prennent l'espace du rôle actif.
+  const roleDuChemin = (['admin', 'formateur', 'arbitre'] as AppRole[]).find((r) => pathname.startsWith(`/${r}`));
+  const espace = roleDuChemin ?? activeRole;
+  if (espace) {
+    const { sousTitre, menu, liens } = ESPACES[espace];
     return (
-      <div className="min-h-screen md:flex bg-terrain font-admin zone-admin">
+      <div className="min-h-screen md:flex bg-terrain font-admin zone-app">
         <aside className="bg-nuit text-nuit-craie md:w-56 md:shrink-0 md:h-screen md:sticky md:top-0 flex flex-col gap-3 md:gap-5 p-3 md:p-4">
           <div className="flex items-center justify-between gap-3">
             <p className="font-display font-bold text-2xl leading-none">
               QCM Arbitres
-              <span className="block font-admin font-normal text-xs opacity-70 mt-1">Administration</span>
+              <span className="block font-admin font-normal text-xs opacity-70 mt-1">{sousTitre}</span>
             </p>
             <button onClick={() => signOut()} className="md:hidden text-sm underline opacity-80 min-h-0">
               Déconnexion
             </button>
           </div>
-          <AdminNav />
+          <MenuEspace liens={liens} titre={menu} />
           <div className="hidden md:flex md:mt-auto flex-col gap-2 text-sm">
             <RoleSwitcher />
             <span className="opacity-70">{profile?.full_name}</span>

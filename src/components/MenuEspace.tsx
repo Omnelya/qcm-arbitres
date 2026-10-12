@@ -1,18 +1,16 @@
 import { NavLink } from 'react-router-dom';
 
-const liens = [
-  { to: '/admin', label: "Vue d'ensemble", end: true },
-  { to: '/admin/comptes', label: 'Comptes' },
-  { to: '/admin/structures', label: 'Structures' },
-  { to: '/admin/journal', label: 'Journal' },
-  { to: '/admin/reglages', label: 'Réglages' },
-];
+export interface LienMenu {
+  to: string;
+  label: string;
+  end?: boolean;
+}
 
-// Menu de l'espace administrateur : vertical dans la barre latérale sur
-// ordinateur, horizontal (défilant) en haut de l'écran sur téléphone.
-export default function AdminNav() {
+// Menu de chaque espace (admin, formateur, arbitre) : vertical dans la barre
+// latérale sur ordinateur, horizontal (défilant) en haut de l'écran sur téléphone.
+export default function MenuEspace({ liens, titre }: { liens: LienMenu[]; titre: string }) {
   return (
-    <nav aria-label="Menu administrateur" className="flex md:flex-col gap-1 overflow-x-auto w-full">
+    <nav aria-label={titre} className="flex md:flex-col gap-1 overflow-x-auto w-full">
       {liens.map((lien) => (
         <NavLink
           key={lien.to}
