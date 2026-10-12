@@ -15,7 +15,7 @@
 // variable d'environnement CRON_SECRET de cette fonction.
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
-const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://fwizzi.github.io/qcm-arbitres';
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://omnelya.github.io/qcm-arbitres';
 
 function json(body: unknown, status: number) {
   return new Response(JSON.stringify(body), {

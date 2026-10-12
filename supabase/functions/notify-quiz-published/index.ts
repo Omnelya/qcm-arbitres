@@ -35,7 +35,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://fwizzi.github.io/qcm-arbitres';
+const SITE_URL = Deno.env.get('SITE_URL') ?? 'https://omnelya.github.io/qcm-arbitres';
 const DELAI_ENTRE_ENVOIS_MS = 2000;
 
 function json(body: unknown, status: number) {
