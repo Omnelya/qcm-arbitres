@@ -1,0 +1,14 @@
+{
+  "name": "QCM Arbitres",
+  "short_name": "QCM Arbitres",
+  "description": "QCM vidéo pour la formation des arbitres",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F5F3",
+  "theme_color": "#2E6B50",
+  "lang": "fr",
+  "icons": [
+    { "src": "logo-qcm.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
