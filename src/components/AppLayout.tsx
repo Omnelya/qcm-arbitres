@@ -60,12 +60,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <div className="min-h-screen bg-canvas zone-app pb-24 md:pb-0">
         <header className="bg-surface shadow-[0_1px_0_#E2E7E3] sticky top-0 z-10">
           <div className="max-w-3xl mx-auto px-4 py-3 flex items-center gap-3">
-            <span className="w-9 h-9 rounded-xl bg-pitch grid place-items-center shrink-0" aria-hidden="true">
-              <svg width="20" height="20" viewBox="0 0 20 20">
-                <circle cx="10" cy="10" r="8" fill="none" stroke="#fff" strokeWidth="1.8" />
-                <path d="M3.5 7.5 Q10 4.5 16.5 7.5 M3.5 12.5 Q10 15.5 16.5 12.5" fill="none" stroke="#fff" strokeWidth="1.5" />
-              </svg>
-            </span>
+            <img
+              src={`${import.meta.env.BASE_URL}logo-qcm.png`}
+              alt=""
+              width={36}
+              height={36}
+              className="w-9 h-9 rounded-xl shrink-0"
+            />
             <p className="flex-1 min-w-0 leading-tight">
               <span className="block font-bold">QCM Arbitres</span>
               <span className="block text-xs text-muted">{sousTitre}</span>
