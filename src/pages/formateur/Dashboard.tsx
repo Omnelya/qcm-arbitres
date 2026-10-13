@@ -6,6 +6,7 @@ import { supabase } from '../../lib/supabaseClient';
 import { BadgesStructures } from '../../components/BadgeStructure';
 import { chargerStructuresDesQcm, type Structure } from '../../lib/structures';
 import { useAuth } from '../../hooks/useAuth';
+import { logActivity } from '../../lib/activityLog';
 
 interface QuizRow {
   id: string;
@@ -80,6 +81,27 @@ export default function FormateurDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [creation, setCreation] = useState(false);
   const [rappelRgpdOuvert, setRappelRgpdOuvert] = useState(false);
+  // Suppression d'un QCM depuis la liste : confirmation obligatoire
+  const [aSupprimer, setASupprimer] = useState<string | null>(null);
+  const [suppression, setSuppression] = useState(false);
+  const [erreurSuppression, setErreurSuppression] = useState<string | null>(null);
+
+  async function supprimerQcm(q: QuizRow) {
+    setSuppression(true);
+    setErreurSuppression(null);
+    // Même suppression que l'onglet Résultats : vidéos d'abord (un échec ne
+    // bloque pas), puis le QCM, ses questions et ses réponses.
+    await supabase.functions.invoke('delete-quiz-videos', { body: { quizId: q.id } });
+    const { error: err } = await supabase.from('quizzes').delete().eq('id', q.id);
+    setSuppression(false);
+    if (err) {
+      setErreurSuppression('La suppression a échoué. Réessaie dans un instant.');
+      return;
+    }
+    setASupprimer(null);
+    setQuizzes((prev) => prev.filter((x) => x.id !== q.id));
+    await logActivity(`a supprimé le QCM « ${q.title} »`, 'quiz', q.id);
+  }
 
   useEffect(() => {
     async function charger() {
@@ -273,12 +295,53 @@ export default function FormateurDashboard() {
                   </span>
                 )}
               </Link>
-              <Link
-                to={`/formateur/qcm/${q.id}/resultats`}
-                className="block text-center text-xs border border-border rounded py-1.5"
-              >
-                Voir les résultats
-              </Link>
+              <div className="flex gap-2">
+                <Link
+                  to={`/formateur/qcm/${q.id}/resultats`}
+                  className="flex-1 text-center text-xs border border-border rounded-xl py-1.5"
+                >
+                  Voir les résultats
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setErreurSuppression(null);
+                    setASupprimer(aSupprimer === q.id ? null : q.id);
+                  }}
+                  aria-expanded={aSupprimer === q.id}
+                  className="flex-1 text-xs border border-border rounded-xl py-1.5 min-h-0 text-card-red"
+                >
+                  Supprimer
+                </button>
+              </div>
+              {aSupprimer === q.id && (
+                <div className="mt-3 bg-card-red-bg rounded-xl p-3">
+                  <p className="text-sm mb-1">Supprimer le QCM « {q.title} » ?</p>
+                  <p className="text-xs text-muted mb-3">
+                    Ses questions, ses vidéos et les réponses des arbitres seront supprimées. Cette action est
+                    définitive.
+                  </p>
+                  {erreurSuppression && <p className="text-xs text-card-red mb-2">{erreurSuppression}</p>}
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setASupprimer(null)}
+                      disabled={suppression}
+                      className="flex-1 bg-surface border border-border rounded-xl py-2 text-sm disabled:opacity-60"
+                    >
+                      Annuler
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => supprimerQcm(q)}
+                      disabled={suppression}
+                      className="flex-1 bg-card-red text-white rounded-xl py-2 text-sm font-semibold disabled:opacity-60"
+                    >
+                      {suppression ? 'Suppression…' : 'Supprimer définitivement'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </li>
           );
         })}
