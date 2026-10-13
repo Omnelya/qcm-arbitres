@@ -7,7 +7,12 @@
     <!-- Icône (onglet du navigateur et écran d'accueil du téléphone) -->
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%icone.svg" />
     <link rel="apple-touch-icon" href="%BASE_URL%icone-v4-180.png" />
-    <link rel="manifest" href="%BASE_URL%app-v4.webmanifest" />
+    <script>
+      // L'iPhone utilise sinon les icônes du manifeste et affiche une lettre : on ne le donne qu'aux autres appareils
+      if (!/iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))) {
+        var m = document.createElement('link'); m.rel = 'manifest'; m.href = '%BASE_URL%app-v4.webmanifest'; document.head.appendChild(m);
+      }
+    </script>
     <meta name="theme-color" content="#2E6B50" />
     <meta name="apple-mobile-web-app-title" content="QCM Arbitres" />
     <meta name="apple-mobile-web-app-capable" content="yes" />

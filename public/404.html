@@ -5,7 +5,12 @@
     <title>QCM Arbitres</title>
     <!-- Mêmes icônes que index.html : l'iPhone peut créer le raccourci depuis cette page -->
     <link rel="apple-touch-icon" href="/qcm-arbitres/icone-v4-180.png" />
-    <link rel="manifest" href="/qcm-arbitres/app-v4.webmanifest" />
+    <script>
+      // L'iPhone utilise sinon les icônes du manifeste et affiche une lettre : on ne le donne qu'aux autres appareils
+      if (!/iPhone|iPad|iPod/.test(navigator.userAgent) && !(navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent))) {
+        var m = document.createElement('link'); m.rel = 'manifest'; m.href = '/qcm-arbitres/app-v4.webmanifest'; document.head.appendChild(m);
+      }
+    </script>
     <meta name="apple-mobile-web-app-title" content="QCM Arbitres" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <script>
