@@ -60,14 +60,14 @@
 .zone-app main {
   animation: apparition 0.25s ease;
 }
+/* Fondu seul : un « transform » sur <main> enfermerait les fenêtres pop-up
+   (position: fixed) dans la zone de la page, sous le menu du bas. */
 @keyframes apparition {
   from {
     opacity: 0;
-    transform: translateY(4px);
   }
   to {
     opacity: 1;
-    transform: none;
   }
 }
 @media (prefers-reduced-motion: reduce) {

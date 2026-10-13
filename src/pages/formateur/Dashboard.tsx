@@ -86,6 +86,8 @@ export default function FormateurDashboard() {
   const [suppression, setSuppression] = useState(false);
   const [erreurSuppression, setErreurSuppression] = useState<string | null>(null);
 
+  const qcmASupprimer = quizzes.find((x) => x.id === aSupprimer) ?? null;
+
   async function supprimerQcm(q: QuizRow) {
     setSuppression(true);
     setErreurSuppression(null);
@@ -306,46 +308,59 @@ export default function FormateurDashboard() {
                   type="button"
                   onClick={() => {
                     setErreurSuppression(null);
-                    setASupprimer(aSupprimer === q.id ? null : q.id);
+                    setASupprimer(q.id);
                   }}
-                  aria-expanded={aSupprimer === q.id}
+                  aria-haspopup="dialog"
                   className="flex-1 text-xs border border-border rounded-xl py-1.5 min-h-0 text-card-red"
                 >
                   Supprimer
                 </button>
               </div>
-              {aSupprimer === q.id && (
-                <div className="mt-3 bg-card-red-bg rounded-xl p-3">
-                  <p className="text-sm mb-1">Supprimer le QCM « {q.title} » ?</p>
-                  <p className="text-xs text-muted mb-3">
-                    Ses questions, ses vidéos et les réponses des arbitres seront supprimées. Cette action est
-                    définitive.
-                  </p>
-                  {erreurSuppression && <p className="text-xs text-card-red mb-2">{erreurSuppression}</p>}
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setASupprimer(null)}
-                      disabled={suppression}
-                      className="flex-1 bg-surface border border-border rounded-xl py-2 text-sm disabled:opacity-60"
-                    >
-                      Annuler
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => supprimerQcm(q)}
-                      disabled={suppression}
-                      className="flex-1 bg-card-red text-white rounded-xl py-2 text-sm font-semibold disabled:opacity-60"
-                    >
-                      {suppression ? 'Suppression…' : 'Supprimer définitivement'}
-                    </button>
-                  </div>
-                </div>
-              )}
             </li>
           );
         })}
       </ul>
+      {qcmASupprimer && (
+        <div
+          className="fixed inset-0 z-50 bg-ink/45 flex items-center justify-center p-4"
+          onClick={() => !suppression && setASupprimer(null)}
+        >
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="titre-suppression"
+            className="bg-surface rounded-2xl shadow-carte-haute w-full max-w-sm p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="titre-suppression" className="font-bold mb-1">
+              Supprimer le QCM « {qcmASupprimer.title} » ?
+            </p>
+            <p className="text-sm text-muted mb-4">
+              Ses questions, ses vidéos et les réponses des arbitres seront supprimées. Cette action est définitive.
+            </p>
+            {erreurSuppression && <p className="text-sm text-card-red mb-3">{erreurSuppression}</p>}
+            <div className="flex gap-2">
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setASupprimer(null)}
+                disabled={suppression}
+                className="flex-1 bg-canvas rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                onClick={() => supprimerQcm(qcmASupprimer)}
+                disabled={suppression}
+                className="flex-1 bg-card-red text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+              >
+                {suppression ? 'Suppression…' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }
