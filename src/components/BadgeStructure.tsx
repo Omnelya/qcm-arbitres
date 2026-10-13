@@ -12,8 +12,8 @@ export default function BadgeStructure({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs font-normal text-ink rounded px-2 py-0.5 border max-w-full ${className}`}
-      style={{ backgroundColor: `${structure.color}14`, borderColor: `${structure.color}66` }}
+      className={`inline-flex items-center gap-1.5 text-xs font-semibold text-ink rounded-full px-2.5 py-0.5 max-w-full ${className}`}
+      style={{ backgroundColor: `${structure.color}1F` }}
     >
       <span
         aria-hidden="true"

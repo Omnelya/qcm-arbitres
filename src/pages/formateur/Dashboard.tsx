@@ -252,7 +252,7 @@ export default function FormateurDashboard() {
               <Link to={`/formateur/qcm/${q.id}`} className="block mb-2">
                 <div className="flex items-center justify-between mb-1 gap-2">
                   <span className="text-sm font-medium">{q.title}</span>
-                  <span className={`text-xs rounded px-2 py-0.5 shrink-0 ${statut.className}`}>
+                  <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 shrink-0 ${statut.className}`}>
                     {statut.label}
                   </span>
                 </div>
@@ -261,6 +261,17 @@ export default function FormateurDashboard() {
                   {formatDate(q.period_start)} → {formatDate(q.period_end)}
                   {q.computed_status !== 'draft' && ` · ${q.repondus}/${q.cibles} répondus`}
                 </p>
+                {q.computed_status !== 'draft' && q.cibles > 0 && (
+                  <span className="block h-2 mt-2 rounded-full bg-canvas overflow-hidden">
+                    <span
+                      className="block h-full rounded-full"
+                      style={{
+                        width: `${Math.round((q.repondus / q.cibles) * 100)}%`,
+                        backgroundColor: q.structures[0]?.color ?? 'rgb(var(--pitch-rgb))',
+                      }}
+                    />
+                  </span>
+                )}
               </Link>
               <Link
                 to={`/formateur/qcm/${q.id}/resultats`}

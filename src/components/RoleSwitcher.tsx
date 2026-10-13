@@ -7,7 +7,7 @@ const LABELS: Record<AppRole, string> = {
   arbitre: 'Arbitre',
 };
 
-// sombre : version pour l'encart vert foncé de la barre latérale.
+// sombre : version de l'en-tête (pastilles arrondies, maquette v3).
 export default function RoleSwitcher({ sombre = false }: { sombre?: boolean }) {
   const { roles, activeRole, setActiveRole } = useAuth();
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ export default function RoleSwitcher({ sombre = false }: { sombre?: boolean }) {
       aria-label="Choisir mon profil"
       className={
         sombre
-          ? 'flex gap-1 bg-nuit-clair rounded p-1 w-full md:flex-col'
+          ? 'flex gap-1 bg-canvas rounded-full p-1 w-full md:w-auto'
           : 'flex gap-1 bg-canvas border border-border rounded p-1 w-fit'
       }
     >
@@ -43,8 +43,8 @@ export default function RoleSwitcher({ sombre = false }: { sombre?: boolean }) {
             'px-3 py-1.5 text-sm rounded min-h-0 ' +
             (sombre
               ? activeRole === role
-                ? 'flex-1 md:flex-none md:text-left bg-or text-nuit font-semibold'
-                : 'flex-1 md:flex-none md:text-left text-nuit-craie/80 hover:bg-nuit/40'
+                ? 'flex-1 md:flex-none rounded-full px-4 bg-surface text-ink font-semibold shadow-carte'
+                : 'flex-1 md:flex-none rounded-full px-4 text-muted font-semibold'
               : activeRole === role
                 ? 'bg-pitch text-white font-medium'
                 : 'text-muted')

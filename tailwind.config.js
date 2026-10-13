@@ -5,11 +5,13 @@ export default {
     extend: {
       colors: {
         // Fond neutre clair et encre : lisibles en plein soleil, sur le terrain.
-        ink: '#1A1D1B',
-        canvas: '#F7F7F5',
+        // Maquette v3 « sobre, chaleureux, rassurant » (13/10/2026)
+        ink: '#1E2A24',
+        canvas: '#F3F5F3',
         surface: '#FFFFFF',
-        border: '#E3E1DB',
-        muted: '#6B6B64',
+        border: '#E2E7E3',
+        muted: '#66736C',
+        ambre: { DEFAULT: '#E39B32', fonce: '#B4741A', doux: '#FDF3E3' },
         // Vert profond : couleur principale de l'application.
         // Couleurs "vertes" de l'application, pilotées par des variables CSS
         // (src/index.css) : sur les écrans d'un QCM, elles prennent la
@@ -21,14 +23,6 @@ export default {
         },
         // Doré et rouge brique : clin d'œil aux cartons jaune/rouge de l'arbitrage,
         // utilisés pour les états d'avertissement et de danger.
-        // Tableau de marque de l'espace administrateur
-        nuit: {
-          DEFAULT: '#0F2E21',
-          clair: '#1A4532',
-          craie: '#E6EFE9',
-        },
-        or: '#E0A526',
-        terrain: '#F2F4F1',
         card: {
           yellow: '#C99A2E',
           'yellow-bg': '#FBF3E2',
@@ -37,13 +31,14 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        // Espace administrateur (maquette A « Table de marque »)
-        admin: ['"Source Sans 3"', 'Inter', 'system-ui', 'sans-serif'],
-        display: ['"Barlow Condensed"', '"Arial Narrow"', 'sans-serif'],
+        sans: ['Figtree', 'system-ui', '-apple-system', '"Segoe UI"', 'sans-serif'],
       },
       borderRadius: {
-        DEFAULT: '10px',
+        DEFAULT: '12px',
+      },
+      boxShadow: {
+        carte: '0 1px 2px rgba(30,42,36,.06), 0 6px 18px rgba(30,42,36,.07)',
+        'carte-haute': '0 2px 4px rgba(30,42,36,.08), 0 12px 28px rgba(30,42,36,.12)',
       },
     },
   },

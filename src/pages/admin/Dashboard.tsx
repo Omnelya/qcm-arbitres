@@ -192,7 +192,9 @@ export default function AdminDashboard() {
       action: 'Voir',
       aller: () => navigate('/admin/comptes', { state: { tri: 'jamais-connecte' } }),
     },
-  ].filter((l) => l.n > 0);
+  ]
+    .slice(1) // « sans structure » est affiché dans l'encart ambre en haut
+    .filter((l) => l.n > 0);
 
   const aujourdhui = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -216,30 +218,43 @@ export default function AdminDashboard() {
         </div>
         {erreur && <p className="text-sm text-card-red">{erreur}</p>}
 
-        {/* Tableau d'affichage */}
-        <dl className="grid grid-cols-2 md:grid-cols-4 bg-nuit text-nuit-craie rounded-lg overflow-hidden">
+        {/* Chiffres clés */}
+        <dl className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
           {[
             { n: nbArbitres, label: 'arbitres' },
             { n: nbFormateurs, label: 'formateurs' },
             { n: nbActifs, label: 'QCM en cours' },
             { n: nbNonRepondants, label: 'réponses attendues', alerte: true },
-          ].map((c, i) => (
-            <div
-              key={c.label}
-              className={`px-4 py-3 border-nuit-clair ${i % 2 === 0 ? 'border-r' : ''} ${i < 2 ? 'border-b md:border-b-0' : ''} md:border-r md:last:border-r-0`}
-            >
-              <dd className={`font-display font-bold text-4xl leading-none tabular-nums ${c.alerte ? 'text-or' : ''}`}>
+          ].map((c) => (
+            <div key={c.label} className="bg-surface border rounded-2xl px-3.5 py-3">
+              <dd className={`text-[26px] font-extrabold leading-tight tabular-nums ${c.alerte && c.n > 0 ? 'text-ambre-fonce' : ''}`}>
                 {c.n}
               </dd>
-              <dt className="text-sm opacity-80 mt-1">{c.label}</dt>
+              <dt className="text-[13px] text-muted">{c.label}</dt>
             </div>
           ))}
         </dl>
 
+        {aTraiter.sansStructure > 0 && (
+          <div className="flex items-center gap-3 bg-ambre-doux rounded-2xl px-3.5 py-3">
+            <span className="w-9 h-9 rounded-full bg-surface grid place-items-center font-extrabold text-ambre-fonce shrink-0">
+              {aTraiter.sansStructure}
+            </span>
+            <p className="flex-1 text-sm">compte(s) sans structure : leurs formateurs ne les voient pas.</p>
+            <button
+              type="button"
+              onClick={() => navigate('/admin/comptes', { state: { filtreStructure: 'aucune' } })}
+              className="bg-surface rounded-xl px-3 py-1.5 text-[13px] font-bold shadow-carte min-h-0"
+            >
+              Affecter
+            </button>
+          </div>
+        )}
+
         {/* QCM */}
         <section className="flex flex-col gap-2">
           <div className="flex items-end justify-between gap-3 flex-wrap">
-            <h2 className="text-base font-semibold">Tous les QCM</h2>
+            <h2 className="text-sm font-bold text-muted">Tous les QCM</h2>
             <span className="text-sm text-muted">
               {quizzesFiltres.length === quizzes.length
                 ? `${quizzes.length} QCM`
@@ -295,70 +310,48 @@ export default function AdminDashboard() {
           {quizzes.length > 0 && quizzesFiltres.length === 0 && (
             <p className="text-sm text-muted">Aucun QCM ne correspond à ces critères.</p>
           )}
-          {quizzesFiltres.length > 0 && (
-            <div className="overflow-x-auto bg-surface border border-border rounded-lg">
-              <table className="w-full min-w-[640px] text-sm border-collapse">
-                <thead>
-                  <tr className="text-left text-muted text-[13px]">
-                    <th className="font-semibold px-3 py-2.5 border-b border-border">QCM</th>
-                    <th className="font-semibold px-3 py-2.5 border-b border-border">Structure</th>
-                    <th className="font-semibold px-3 py-2.5 border-b border-border">Réponses</th>
-                    <th className="font-semibold px-3 py-2.5 border-b border-border">Fin</th>
-                    <th className="font-semibold px-3 py-2.5 border-b border-border">État</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {quizzesFiltres.map((q) => {
-                    const statut = STATUT[q.computed_status];
-                    const couleur = q.structures[0]?.color ?? '#6B6B64';
-                    const pct = q.cibles > 0 ? Math.round((q.repondus / q.cibles) * 100) : 0;
-                    return (
-                      <tr key={q.id} className="border-b border-[#ECEFEC] last:border-b-0 hover:bg-[#F6F8F6]">
-                        <td className="px-3 py-2.5" style={{ boxShadow: `inset 4px 0 0 ${couleur}` }}>
-                          <Link to={`/admin/qcm/${q.id}/resultats`} className="font-semibold hover:underline">
-                            {q.title}
-                          </Link>
-                          <span className="block text-[13px] text-muted">par {q.formateur_nom}</span>
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {q.structures.length > 0 ? (
-                            <BadgesStructures structures={q.structures} />
-                          ) : (
-                            <span className="text-muted">—</span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5">
-                          {q.computed_status === 'draft' ? (
-                            <span className="text-muted">—</span>
-                          ) : (
-                            <span className="flex items-center gap-2 tabular-nums">
-                              <span className="flex-1 min-w-[60px] h-1.5 rounded bg-[#E4E8E4] overflow-hidden">
-                                <span className="block h-full" style={{ width: `${pct}%`, backgroundColor: couleur }} />
-                              </span>
-                              {q.repondus}/{q.cibles}
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-3 py-2.5 whitespace-nowrap">{dateCourte(q.period_end)}</td>
-                        <td className="px-3 py-2.5">
-                          <span className={`text-xs font-semibold rounded-full px-2 py-0.5 whitespace-nowrap ${statut.className}`}>
-                            {statut.label}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <ul className="flex flex-col gap-2.5">
+            {quizzesFiltres.map((q) => {
+              const statut = STATUT[q.computed_status];
+              const couleur = q.structures[0]?.color ?? '#66736C';
+              const pct = q.cibles > 0 ? Math.round((q.repondus / q.cibles) * 100) : 0;
+              return (
+                <li key={q.id}>
+                  <Link
+                    to={`/admin/qcm/${q.id}/resultats`}
+                    className="flex flex-col gap-2 bg-surface rounded-2xl p-3.5 shadow-carte hover:shadow-carte-haute hover:-translate-y-px"
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <BadgesStructures structures={q.structures} />
+                      <span className={`text-xs font-bold rounded-full px-2.5 py-0.5 whitespace-nowrap ${statut.className}`}>
+                        {statut.label}
+                      </span>
+                    </span>
+                    <span className="flex items-baseline justify-between gap-2">
+                      <span className="font-bold">{q.title}</span>
+                      {q.computed_status !== 'draft' && <span className="font-bold tabular-nums">{pct} %</span>}
+                    </span>
+                    {q.computed_status !== 'draft' && (
+                      <span className="block h-2 rounded-full bg-canvas overflow-hidden">
+                        <span className="block h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: couleur }} />
+                      </span>
+                    )}
+                    <span className="flex justify-between gap-2 text-[13px] text-muted">
+                      <span>{q.formateur_nom}{q.computed_status !== 'draft' && ` · ${q.repondus}/${q.cibles} réponses`}</span>
+                      <span className="whitespace-nowrap">fin le {dateCourte(q.period_end)}</span>
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
         </section>
 
         {/* À traiter + Structures */}
         <div className="grid md:grid-cols-[1.2fr_1fr] gap-4">
           <section>
-            <h2 className="text-base font-semibold mb-2">À traiter</h2>
-            <ul className="bg-surface border border-border rounded-lg px-3.5">
+            <h2 className="text-sm font-bold text-muted mb-2">À traiter</h2>
+            <ul className="bg-surface border rounded-2xl px-3.5">
               {lignesATraiter.length === 0 && <li className="py-3 text-sm text-muted">Rien à traiter pour le moment.</li>}
               {lignesATraiter.map((l) => (
                 <li key={l.texte} className="flex items-center justify-between gap-3 py-2.5 border-b border-[#ECEFEC] last:border-b-0 text-sm">
@@ -372,8 +365,8 @@ export default function AdminDashboard() {
           </section>
           {structures.length > 0 && (
             <section>
-              <h2 className="text-base font-semibold mb-2">Structures</h2>
-              <ul className="bg-surface border border-border rounded-lg px-3.5">
+              <h2 className="text-sm font-bold text-muted mb-2">Structures</h2>
+              <ul className="bg-surface border rounded-2xl px-3.5">
                 {structures.map((s) => (
                   <li key={s.id} className="border-b border-[#ECEFEC] last:border-b-0">
                     <Link to="/admin/structures" className="flex items-center justify-between gap-3 py-2.5 text-sm">

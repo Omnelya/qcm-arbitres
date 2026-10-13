@@ -5,9 +5,9 @@
 @layer base {
   /* Vert par défaut de l'application (#1F6F4A, #164F35, #E6F0EA). */
   :root {
-    --pitch-rgb: 31 111 74;
-    --pitch-dark-rgb: 22 79 53;
-    --pitch-light-rgb: 230 240 234;
+    --pitch-rgb: 46 107 80;
+    --pitch-dark-rgb: 30 74 55;
+    --pitch-light-rgb: 231 241 236;
     --sur-pitch: #ffffff;
   }
 
@@ -24,10 +24,56 @@
   color: var(--sur-pitch);
 }
 
-/* Espaces admin, formateur, arbitre : titres de page en caractères « tableau de marque ». */
+/* ===== Maquette v3 : sobre, chaleureux, rassurant (cartes en relief, arrondis) ===== */
 .zone-app h1 {
-  font-family: 'Barlow Condensed', 'Arial Narrow', sans-serif;
-  font-size: 2rem;
-  line-height: 1.05;
-  font-weight: 600;
+  font-size: 1.4rem;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+/* Les blocs blancs encadrés deviennent des cartes en léger relief. */
+.zone-app .bg-surface.border {
+  border-color: transparent;
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(30, 42, 36, 0.06), 0 6px 18px rgba(30, 42, 36, 0.07);
+}
+.zone-app input:not([type='checkbox']):not([type='radio']),
+.zone-app select,
+.zone-app textarea {
+  border-radius: 12px;
+  background-color: #fff;
+}
+/* Boutons principaux : ombre douce et réaction au toucher. */
+.zone-app .bg-pitch {
+  box-shadow: 0 2px 6px rgb(var(--pitch-rgb) / 0.3);
+}
+.zone-app button,
+.zone-app a {
+  transition: transform 0.12s ease, filter 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+.zone-app button:not(:disabled):active {
+  transform: scale(0.98);
+}
+.zone-app button.bg-pitch:not(:disabled):hover {
+  filter: brightness(1.06);
+}
+.zone-app main {
+  animation: apparition 0.25s ease;
+}
+@keyframes apparition {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .zone-app *,
+  .zone-app main {
+    animation: none !important;
+    transition: none !important;
+  }
 }

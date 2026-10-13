@@ -31,7 +31,7 @@ function joursRestants(d: string) {
 }
 
 export default function ArbitreAccueil() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const navigate = useNavigate();
   const [quizzes, setQuizzes] = useState<QuizDispo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -118,12 +118,13 @@ export default function ArbitreAccueil() {
 
   return (
     <AppLayout>
-      <h1 className="text-lg font-semibold mb-4">Mes QCM à faire</h1>
+      <h1>Bonjour {profile?.full_name?.split(' ')[0] ?? ''}</h1>
+      <p className="text-sm text-muted mt-1 mb-4">
+        {quizzes.length === 0
+          ? 'Aucun QCM ne t\'attend pour le moment.'
+          : `${quizzes.length} QCM ${quizzes.length > 1 ? "t'attendent" : "t'attend"}.`}
+      </p>
       {erreur && <p className="text-sm text-card-red mb-4">{erreur}</p>}
-
-      {quizzes.length === 0 && (
-        <p className="text-sm text-muted">Aucun QCM en attente pour le moment.</p>
-      )}
 
       <ul className="flex flex-col gap-2">
         {quizzes.map((q) => {
