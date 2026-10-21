@@ -19,7 +19,7 @@ if (
   (location.hash.includes('type=invite') ||
     location.hash.includes('type=recovery') ||
     location.hash.includes('error=')) &&
-  !location.pathname.endsWith('/activer-mon-compte')
+  !/\/activer-mon-compte\/?$/.test(location.pathname)
 ) {
   location.replace(`${import.meta.env.BASE_URL}activer-mon-compte${location.hash}`);
 }
