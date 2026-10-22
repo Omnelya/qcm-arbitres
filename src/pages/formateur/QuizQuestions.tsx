@@ -104,6 +104,51 @@ export default function QuizQuestions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizId]);
 
+  // Brouillon de la NOUVELLE question, gardé dans le navigateur au fil de la
+  // saisie : un onglet rechargé par le navigateur (téléphone surtout) ne fait
+  // plus perdre le texte. shortcut: brouillon local à l'appareil, sans fichier
+  // vidéo/image ni modification d'une question existante ; passer à la base si
+  // un brouillon multi-appareils est demandé.
+  const cleBrouillon = `brouillon-question:${quizId}`;
+  const [brouillonPret, setBrouillonPret] = useState(false);
+  const [brouillonRestaure, setBrouillonRestaure] = useState(false);
+
+  useEffect(() => {
+    setBrouillonPret(false);
+    try {
+      const b = JSON.parse(localStorage.getItem(cleBrouillon) ?? 'null');
+      if (b && typeof b.texte === 'string' && Array.isArray(b.options) && b.options.length >= 2) {
+        setType(b.type === 'video' || b.type === 'image' ? b.type : 'text');
+        setTexte(b.texte);
+        setExplication(typeof b.explication === 'string' ? b.explication : '');
+        setOptions(
+          b.options.map((o: Partial<AnswerOption>) => ({
+            id: typeof o.id === 'string' ? o.id : crypto.randomUUID(),
+            text: String(o.text ?? ''),
+            is_correct: !!o.is_correct,
+          }))
+        );
+        setBrouillonRestaure(true);
+      }
+    } catch {
+      // stockage indisponible ou brouillon illisible : on repart d'un formulaire vide
+    }
+    setBrouillonPret(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quizId]);
+
+  useEffect(() => {
+    if (!brouillonPret || !quizId) return;
+    try {
+      const vide = !texte.trim() && !explication.trim() && options.every((o) => !o.text.trim());
+      if (questionEnEditionId || vide) localStorage.removeItem(cleBrouillon);
+      else localStorage.setItem(cleBrouillon, JSON.stringify({ type, texte, explication, options }));
+    } catch {
+      // stockage plein ou bloqué : pas de brouillon, le formulaire reste utilisable
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [brouillonPret, questionEnEditionId, type, texte, explication, options]);
+
   function choisirFichier(f: File | null) {
     setFichier(f);
     setApercu(f ? URL.createObjectURL(f) : null);
@@ -122,6 +167,7 @@ export default function QuizQuestions() {
   }
 
   function reinitialiserFormulaire() {
+    setBrouillonRestaure(false);
     setQuestionEnEditionId(null);
     setType('text');
     setTexte('');
@@ -518,6 +564,12 @@ export default function QuizQuestions() {
             </button>
           )}
         </div>
+
+        {brouillonRestaure && !questionEnEditionId && (
+          <p className="text-xs text-muted bg-canvas rounded-lg px-3 py-2 mb-3">
+            Brouillon retrouvé : ta question en cours a été restaurée. Si elle contenait une vidéo ou une image, choisis-la de nouveau.
+          </p>
+        )}
 
         <div className="flex gap-2 mb-4">
           {(['video', 'image', 'text'] as QuestionType[]).map((t) => (
