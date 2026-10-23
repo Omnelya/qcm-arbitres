@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
 import PiocherBanque from '../../components/PiocherBanque';
+import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 import { useSuspendreDeconnexionInactivite } from '../../lib/inactivite';
@@ -58,6 +59,26 @@ export default function QuizQuestions() {
 
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [statutQcm, setStatutQcm] = useState<'draft' | 'published' | null>(null);
+  const { roles } = useAuth();
+  const estAdmin = roles.includes('admin');
+  const [proposerBanque, setProposerBanque] = useState<string | null>(null); // id de la question modifiée
+  const [majBanqueEnCours, setMajBanqueEnCours] = useState(false);
+  const [erreurBanque, setErreurBanque] = useState<string | null>(null);
+  const [infoBanque, setInfoBanque] = useState<string | null>(null);
+
+  async function mettreAJourBanque() {
+    if (!proposerBanque) return;
+    setMajBanqueEnCours(true);
+    setErreurBanque(null);
+    const { error } = await supabase.rpc('banque_mettre_a_jour', { p_question: proposerBanque });
+    setMajBanqueEnCours(false);
+    if (error) {
+      setErreurBanque('La mise à jour de la banque a échoué. Réessaie dans un instant.');
+      return;
+    }
+    setProposerBanque(null);
+    setInfoBanque('La banque de questions a été mise à jour.');
+  }
   const [loading, setLoading] = useState(true);
   const [erreurListe, setErreurListe] = useState<string | null>(null);
 
@@ -316,6 +337,7 @@ export default function QuizQuestions() {
   async function enregistrerQuestion(e: FormEvent) {
     e.preventDefault();
     setErreurForm(null);
+    setInfoBanque(null);
 
     if (!quizId) return;
     if (type !== 'text' && !fichier && !mediaKeyExistant) {
@@ -341,9 +363,18 @@ export default function QuizQuestions() {
         if (fichier) {
           mediaKey = await televerserMedia(fichier, () => {});
         }
-        await enregistrerQuestionEnBase(mediaKey, type, texte, explication, optionsRemplies, questionEnEditionId, 0);
+        const questionModifiee = questionEnEditionId;
+        await enregistrerQuestionEnBase(mediaKey, type, texte, explication, optionsRemplies, questionModifiee, 0);
         reinitialiserFormulaire();
         await charger();
+        // Administrateur : si la question vient de la banque et diffère d'elle, on propose de mettre la banque à jour.
+        if (estAdmin) {
+          const { data: differe } = await supabase.rpc('banque_difference', { p_question: questionModifiee });
+          if (differe === true) {
+            setErreurBanque(null);
+            setProposerBanque(questionModifiee);
+          }
+        }
       } catch (err) {
         setErreurForm(err instanceof Error ? err.message : 'Une erreur est survenue.');
       } finally {
@@ -396,6 +427,7 @@ export default function QuizQuestions() {
       {quizId && <QuizTabs quizId={quizId} />}
       <h1 className="text-lg font-semibold mb-4">Questions</h1>
 
+      {infoBanque && <p className="text-sm text-pitch mb-4">{infoBanque}</p>}
       {loading && <p className="text-sm text-muted">Chargement…</p>}
       {erreurListe && <p className="text-sm text-card-red mb-4">{erreurListe}</p>}
 
@@ -690,6 +722,46 @@ export default function QuizQuestions() {
         </button>
       </form>
       </>
+      )}
+
+      {proposerBanque && (
+        <div className="fixed inset-0 z-50 bg-ink/45 flex items-center justify-center p-4" onClick={() => !majBanqueEnCours && setProposerBanque(null)}>
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="titre-maj-banque"
+            className="bg-surface rounded-2xl shadow-carte-haute w-full max-w-sm p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="titre-maj-banque" className="font-bold mb-1">
+              Mettre à jour la banque ?
+            </p>
+            <p className="text-sm text-muted mb-4">
+              Cette question vient de la banque de questions et tu l’as modifiée. Veux-tu appliquer ces modifications
+              (énoncé, réponses, explication) à la banque ? Les autres QCM déjà créés ne changent pas.
+            </p>
+            {erreurBanque && <p className="text-sm text-card-red mb-3">{erreurBanque}</p>}
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={mettreAJourBanque}
+                disabled={majBanqueEnCours}
+                className="bg-pitch text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+              >
+                {majBanqueEnCours ? 'Patiente…' : 'Oui, mettre à jour la banque'}
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setProposerBanque(null)}
+                disabled={majBanqueEnCours}
+                className="bg-canvas rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
+              >
+                Non, garder dans ce QCM seulement
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </AppLayout>
   );
