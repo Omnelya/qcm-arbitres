@@ -5,6 +5,8 @@ import { supabase } from '../../lib/supabaseClient';
 import { logActivity } from '../../lib/activityLog';
 import { chargerStructures, type Structure } from '../../lib/structures';
 import { lireQuestionsBanque, type ResultatLecture } from '../../lib/banqueExcel';
+import { useAuth } from '../../hooks/useAuth';
+import { banqueMemorisee, memoriserBanque, oublierBanque, type PositionBanque } from '../../lib/dernierePage';
 
 interface BanqueRow {
   id: string;
@@ -99,11 +101,15 @@ function Confirmation({
 function DetailBanque({
   banque,
   structures,
+  userId,
+  initial,
   onRetour,
   onChange,
 }: {
   banque: BanqueRow;
   structures: Structure[];
+  userId: string | undefined;
+  initial: PositionBanque | null;
   onRetour: () => void;
   onChange: () => void;
 }) {
@@ -116,12 +122,12 @@ function DetailBanque({
 
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
-  const [recherche, setRecherche] = useState('');
-  const [rechercheEffective, setRechercheEffective] = useState('');
-  const [filtreTheme, setFiltreTheme] = useState(''); // '' = tous, 'none' = sans thème, sinon id
+  const [page, setPage] = useState(initial?.page ?? 0);
+  const [recherche, setRecherche] = useState(initial?.recherche ?? '');
+  const [rechercheEffective, setRechercheEffective] = useState(initial?.recherche ?? '');
+  const [filtreTheme, setFiltreTheme] = useState(initial?.filtreTheme ?? ''); // '' = tous, 'none' = sans thème, sinon id
   const [cochees, setCochees] = useState<Set<string>>(new Set());
-  const [themeCible, setThemeCible] = useState('none');
+  const [themeCible, setThemeCible] = useState(initial?.themeCible ?? 'none');
   const [ouvertes, setOuvertes] = useState<Set<string>>(new Set());
 
   const [message, setMessage] = useState<string | null>(null);
@@ -197,12 +203,18 @@ function DetailBanque({
 
   // la recherche se lance un instant après la frappe
   useEffect(() => {
+    if (recherche === rechercheEffective) return; // évite de remettre la page à 0 au retour
     const t = setTimeout(() => {
       setRechercheEffective(recherche);
       setPage(0);
     }, 300);
     return () => clearTimeout(t);
-  }, [recherche]);
+  }, [recherche, rechercheEffective]);
+
+  // retient l'endroit où l'on en est pour le retrouver après un changement de page
+  useEffect(() => {
+    if (userId) memoriserBanque(userId, { banqueId: banque.id, page, filtreTheme, recherche, themeCible });
+  }, [userId, banque.id, page, filtreTheme, recherche, themeCible]);
 
   async function basculerStructure(id: string) {
     setErreur(null);
@@ -631,7 +643,10 @@ export default function Banque() {
   const [banques, setBanques] = useState<BanqueRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [erreurListe, setErreurListe] = useState<string | null>(null);
-  const [ouverte, setOuverte] = useState<string | null>(null);
+  const { session } = useAuth();
+  const userId = session?.user.id;
+  const [memo, setMemo] = useState(() => (userId ? banqueMemorisee(userId) : null));
+  const [ouverte, setOuverte] = useState<string | null>(memo?.banqueId ?? null);
 
   const [nom, setNom] = useState('');
   const [structuresImport, setStructuresImport] = useState<Set<string>>(new Set());
@@ -742,7 +757,13 @@ export default function Banque() {
           key={banqueOuverte.id}
           banque={banqueOuverte}
           structures={structures}
-          onRetour={() => setOuverte(null)}
+          userId={userId}
+          initial={memo?.banqueId === banqueOuverte.id ? memo : null}
+          onRetour={() => {
+            oublierBanque();
+            setMemo(null);
+            setOuverte(null);
+          }}
           onChange={charger}
         />
       ) : (
