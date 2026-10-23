@@ -12,14 +12,8 @@ export interface QuestionBanque {
 
 export interface ResultatLecture {
   questions: QuestionBanque[];
-  // numéros ignorés car identiques à une question déjà lue (même énoncé, mêmes propositions, mêmes bonnes réponses)
-  doublons: number[];
   // questions inutilisables (moins de 2 propositions ou aucune bonne réponse)
   invalides: string[];
-}
-
-function normaliser(s: string): string {
-  return s.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 export function lireQuestionsBanque(lignes: unknown[][]): ResultatLecture {
@@ -39,9 +33,7 @@ export function lireQuestionsBanque(lignes: unknown[][]): ResultatLecture {
   }
 
   const questions: QuestionBanque[] = [];
-  const doublons: number[] = [];
   const invalides: string[] = [];
-  const vues = new Set<string>();
 
   for (const q of brutes) {
     const options = q.options.filter((o) => o.text !== '');
@@ -49,20 +41,8 @@ export function lireQuestionsBanque(lignes: unknown[][]): ResultatLecture {
       invalides.push(`Q${q.numero}`);
       continue;
     }
-    const cle =
-      normaliser(q.text) +
-      '|' +
-      options
-        .map((o) => (o.is_correct ? '1' : '0') + normaliser(o.text))
-        .sort()
-        .join('|');
-    if (vues.has(cle)) {
-      doublons.push(q.numero);
-      continue;
-    }
-    vues.add(cle);
     questions.push({ numero: q.numero, text: q.text, options });
   }
 
-  return { questions, doublons, invalides };
+  return { questions, invalides };
 }

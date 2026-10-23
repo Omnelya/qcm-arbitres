@@ -776,11 +776,6 @@ export default function Banque() {
                 <div className="bg-canvas rounded-xl p-3 mb-3 text-sm">
                   <p className="font-semibold">{nomFichier}</p>
                   <p>{lecture.questions.length} question(s) prête(s) à importer.</p>
-                  {lecture.doublons.length > 0 && (
-                    <p className="text-muted">
-                      {lecture.doublons.length} doublon(s) exact(s) ignoré(s) (même énoncé, mêmes réponses).
-                    </p>
-                  )}
                   {lecture.invalides.length > 0 && (
                     <p>
                       {lecture.invalides.length} question(s) inutilisable(s), ignorée(s) :{' '}
