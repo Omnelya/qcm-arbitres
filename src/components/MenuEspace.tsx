@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 
-export type IconeMenu = 'accueil' | 'qcm' | 'groupes' | 'historique' | 'comptes' | 'structures' | 'journal' | 'reglages' | 'profil';
+export type IconeMenu = 'accueil' | 'qcm' | 'groupes' | 'historique' | 'comptes' | 'structures' | 'banque' | 'journal' | 'reglages' | 'profil';
 
 export interface LienMenu {
   to: string;
@@ -17,6 +17,7 @@ const ICONES: Record<IconeMenu, JSX.Element> = {
   historique: <><circle cx="12" cy="12" r="8" /><path d="M12 8v4l3 2" /></>,
   comptes: <><circle cx="12" cy="9" r="3.5" /><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" /></>,
   structures: <><rect x="4" y="4" width="7" height="7" rx="2" /><rect x="13" y="4" width="7" height="7" rx="2" /><rect x="4" y="13" width="7" height="7" rx="2" /><rect x="13" y="13" width="7" height="7" rx="2" /></>,
+  banque: <><ellipse cx="12" cy="6" rx="7" ry="2.5" /><path d="M5 6v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5V6M5 12v6c0 1.4 3.1 2.5 7 2.5s7-1.1 7-2.5v-6" /></>,
   journal: <><path d="M6 4h12v16H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
   reglages: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /></>,
   profil: <><circle cx="12" cy="9" r="3.5" /><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" /></>,

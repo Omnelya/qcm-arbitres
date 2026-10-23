@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
+import PiocherBanque from '../../components/PiocherBanque';
 import { supabase } from '../../lib/supabaseClient';
 import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 import { useSuspendreDeconnexionInactivite } from '../../lib/inactivite';
@@ -553,6 +554,8 @@ export default function QuizQuestions() {
           Ce QCM est publié : les questions ne peuvent plus être modifiées.
         </p>
       ) : (
+      <>
+      {quizId && <PiocherBanque quizId={quizId} onAjoute={charger} />}
       <form onSubmit={enregistrerQuestion} className="bg-surface border border-border rounded p-4">
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-medium">
@@ -686,6 +689,7 @@ export default function QuizQuestions() {
               : 'Enregistrer la question'}
         </button>
       </form>
+      </>
       )}
     </AppLayout>
   );

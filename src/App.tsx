@@ -11,6 +11,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import Comptes from './pages/admin/Comptes';
 import Structures from './pages/admin/Structures';
 import Journal from './pages/admin/Journal';
+import Banque from './pages/admin/Banque';
 import Reglages from './pages/admin/Reglages';
 import FormateurDashboard from './pages/formateur/Dashboard';
 import QuizForm from './pages/formateur/QuizForm';
@@ -69,6 +70,14 @@ export default function App() {
             element={
               <ProtectedRoute role="admin">
                 <Structures />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/banque"
+            element={
+              <ProtectedRoute role="admin">
+                <Banque />
               </ProtectedRoute>
             }
           />

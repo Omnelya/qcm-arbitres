@@ -14,6 +14,7 @@ const ESPACES: Record<AppRole, { sousTitre: string; menu: string; liens: LienMen
       { to: '/admin', label: 'Accueil', icone: 'accueil', end: true },
       { to: '/admin/comptes', label: 'Comptes', icone: 'comptes' },
       { to: '/admin/structures', label: 'Structures', icone: 'structures' },
+      { to: '/admin/banque', label: 'Banque', icone: 'banque' },
       { to: '/admin/journal', label: 'Journal', icone: 'journal' },
       { to: '/admin/reglages', label: 'Réglages', icone: 'reglages' },
     ],
