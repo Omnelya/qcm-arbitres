@@ -7,6 +7,7 @@ import {
 } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabaseClient';
+import { oublierPage } from '../lib/dernierePage';
 import DeconnexionInactivite from '../components/DeconnexionInactivite';
 import {
   activiteEnregistreePerimee,
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setLoading(true);
         loadProfileAndRoles(newSession.user.id).finally(() => setLoading(false));
       } else {
+        oublierPage();
         setProfile(null);
         setRoles([]);
         setActiveRole(null);

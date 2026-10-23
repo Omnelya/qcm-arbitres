@@ -1,4 +1,6 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { memoriserPage, pageMemorisee } from './lib/dernierePage';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import ProtectedRoute from './components/ProtectedRoute';
 import RequireAuth from './components/RequireAuth';
@@ -29,13 +31,26 @@ function AccueilRedirect() {
   const { loading, session, roles } = useAuth();
   if (loading) return <p className="p-6 text-sm text-muted">Chargement…</p>;
   if (!session) return <Navigate to="/login" replace />;
-  return <Navigate to={roles[0] ? `/${roles[0]}` : '/login'} replace />;
+  const derniere = pageMemorisee(session.user.id, roles);
+  return <Navigate to={derniere ?? (roles[0] ? `/${roles[0]}` : '/login')} replace />;
+}
+
+// Retient l'onglet affiché pour le rouvrir au prochain retour sur l'application.
+function MemoireDernierePage() {
+  const { pathname } = useLocation();
+  const { session } = useAuth();
+  const userId = session?.user.id;
+  useEffect(() => {
+    if (userId) memoriserPage(userId, pathname);
+  }, [userId, pathname]);
+  return null;
 }
 
 export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter basename="/qcm-arbitres">
+        <MemoireDernierePage />
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/mot-de-passe-oublie" element={<MotDePasseOublie />} />
