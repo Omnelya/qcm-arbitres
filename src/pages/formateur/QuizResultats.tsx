@@ -33,7 +33,7 @@ export default function QuizResultats() {
   const [erreur, setErreur] = useState<string | null>(null);
   const [confirmationSuppression, setConfirmationSuppression] = useState(false);
   const [suppression, setSuppression] = useState(false);
-  const [exportEnCours, setExportEnCours] = useState<'excel' | 'csv' | null>(null);
+  const [exportEnCours, setExportEnCours] = useState<'excel' | 'csv' | 'pptx' | null>(null);
   // --- Relance par e-mail des arbitres qui n'ont pas répondu ---
   const [periode, setPeriode] = useState<{ statut: string; debut: string; fin: string } | null>(null);
   const [derniereRelance, setDerniereRelance] = useState<{ sent_at: string; recipients: number } | null>(null);
@@ -296,6 +296,26 @@ export default function QuizResultats() {
     }
   }
 
+  // Correction à projeter (visio, formation) : PowerPoint généré dans le navigateur.
+  async function exporterPowerPoint() {
+    if (!quizId) return;
+    setExportEnCours('pptx');
+    try {
+      const { data, error } = await supabase.rpc('get_editor_questions', { p_quiz_id: quizId });
+      if (error) throw error;
+      const { genererPowerPoint } = await import('../../lib/exportPowerPoint');
+      await genererPowerPoint(
+        { titre, nbRepondus: repondus.length, nbArbitres: lignes.length, moyenne: scoreMoyen },
+        (data ?? []) as unknown as Parameters<typeof genererPowerPoint>[1],
+        `${titre} - Correction.pptx`
+      );
+    } catch {
+      setErreur("L'export PowerPoint a échoué. Réessaie dans un instant.");
+    } finally {
+      setExportEnCours(null);
+    }
+  }
+
   function telecharger(blob: Blob, nomFichier: string) {
     const url = URL.createObjectURL(blob);
     const lien = document.createElement('a');
@@ -445,7 +465,7 @@ export default function QuizResultats() {
         </div>
       )}
 
-      <div className="flex gap-2 mb-1">
+      <div className="flex flex-wrap gap-2 mb-1">
         <button
           type="button"
           onClick={exporterExcel}
@@ -462,20 +482,28 @@ export default function QuizResultats() {
         >
           {exportEnCours === 'csv' ? 'Génération…' : 'Export CSV'}
         </button>
+        <button
+          type="button"
+          onClick={exporterPowerPoint}
+          disabled={lignes.length === 0 || exportEnCours !== null}
+          className="flex-1 text-sm border border-border rounded py-1.5 disabled:opacity-50"
+        >
+          {exportEnCours === 'pptx' ? 'Génération…' : 'Correction PowerPoint'}
+        </button>
       </div>
 
       {exportEnCours && (
         <div className="mb-2">
           <div className="h-1.5 bg-pitch rounded animate-pulse" />
           <p className="text-xs text-muted mt-1">
-            Export {exportEnCours === 'excel' ? 'Excel' : 'CSV'} en cours…
+            Export {exportEnCours === 'excel' ? 'Excel' : exportEnCours === 'pptx' ? 'PowerPoint' : 'CSV'} en cours…
           </p>
         </div>
       )}
 
       <p className="text-xs text-muted mb-6">
         Excel inclut le détail question par question (une feuille par question) ; le CSV ne
-        contient que la synthèse des scores.
+        contient que la synthèse des scores. La correction PowerPoint sert à projeter la correction (une paire de diapositives par question).
       </p>
 
       {lignes.length === 0 && (
