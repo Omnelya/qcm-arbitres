@@ -219,67 +219,48 @@ export default function QuizResultats() {
 
       const repondants = lignes.filter((l) => l.statut === 'soumis' && l.attemptId);
       if (repondants.length > 0 && quizId) {
-        const { data: questionsData } = await supabase
-          .from('questions')
-          .select('id, text, order_index')
-          .eq('quiz_id', quizId)
-          .order('order_index');
+        // Questions + réponses possibles (avec la bonne réponse) : la lecture directe de la table des
+        // réponses est restreinte, on passe par la fonction réservée au formateur/administrateur.
+        const { data: questionsData, error: errQuestions } = await supabase.rpc('get_editor_questions', { p_quiz_id: quizId });
+        if (errQuestions) throw errQuestions;
+        const questions = (questionsData ?? []) as unknown as {
+          id: string;
+          text: string;
+          options: { id: string; text: string; is_correct: boolean }[];
+        }[];
 
-        const questionIds = (questionsData ?? []).map((q) => q.id);
-        const { data: optionsData } =
-          questionIds.length > 0
-            ? await supabase.from('answer_options').select('id, question_id, text').in('question_id', questionIds)
-            : { data: [] };
-
-        const attemptIds = repondants.map((r) => r.attemptId as string);
-        const { data: selectionsData } = await supabase
+        const { data: selectionsData, error: errSel } = await supabase
           .from('selected_answers')
           .select('attempt_id, option_id')
-          .in('attempt_id', attemptIds);
+          .in('attempt_id', repondants.map((r) => r.attemptId as string));
+        if (errSel) throw errSel;
+        const cochees = new Set((selectionsData ?? []).map((s) => `${s.attempt_id}|${s.option_id}`));
 
-        // Structures construites UNE SEULE FOIS : recherche instantanée
-        // ensuite, au lieu de reparcourir toute la liste à chaque case
-        // (question × arbitre × réponse), qui devenait très lent avec
-        // beaucoup de questions et d'arbitres.
-        const selectionsParClef = new Set(
-          (selectionsData ?? []).map((s) => `${s.attempt_id}|${s.option_id}`)
-        );
-        const optionsParQuestion = new Map<string, { id: string; text: string }[]>();
-        for (const o of optionsData ?? []) {
-          if (!optionsParQuestion.has(o.question_id)) optionsParQuestion.set(o.question_id, []);
-          optionsParQuestion.get(o.question_id)!.push(o);
-        }
-        for (const liste of optionsParQuestion.values()) {
-          liste.sort((a, b) => a.id.localeCompare(b.id));
-        }
-
-        // Deux réponses d'une même question peuvent avoir exactement le
-        // même texte (ex. données de test tapées rapidement). Comme le
-        // texte sert de nom de colonne Excel, on numérote les doublons
-        // pour ne jamais les faire s'écraser l'un l'autre.
-        const entetesParOption = new Map<string, string>();
-        for (const liste of optionsParQuestion.values()) {
-          const occurrences = new Map<string, number>();
-          for (const o of liste) {
-            const n = (occurrences.get(o.text) ?? 0) + 1;
-            occurrences.set(o.text, n);
-            entetesParOption.set(o.id, n > 1 ? `${o.text} (${n})` : o.text);
+        // Une feuille par question : ligne 1 = énoncé (fusionné), ligne 2 = « Nom Prénom » + réponses
+        // possibles + « Note », puis une ligne par arbitre (y compris ceux qui n'ont pas répondu).
+        questions.forEach((q, index) => {
+          const opts = q.options;
+          const nbCol = opts.length + 2;
+          const lignesFeuille: (string | number | null)[][] = [
+            [q.text, ...Array(nbCol - 1).fill(null)],
+            ['Nom Prénom', ...opts.map((o) => o.text), 'Note'],
+          ];
+          const attendu = opts.filter((o) => o.is_correct).length;
+          for (const l of lignes) {
+            const aRepondu = l.statut === 'soumis' && !!l.attemptId;
+            const coches = aRepondu ? opts.filter((o) => cochees.has(`${l.attemptId}|${o.id}`)) : [];
+            // même formule que la note du QCM : bonnes cochées / bonnes attendues, 0 si trop de cases cochées
+            const bonnes = coches.filter((o) => o.is_correct).length;
+            const note = !aRepondu ? null : attendu === 0 || coches.length > attendu ? 0 : Math.round((bonnes / attendu) * 10000) / 100;
+            lignesFeuille.push([l.full_name, ...opts.map((o) => (coches.includes(o) ? 'X' : '')), note]);
           }
-        }
-
-        (questionsData ?? []).forEach((q, index) => {
-          const optionsQuestion = optionsParQuestion.get(q.id) ?? [];
-
-          const lignesFeuille = repondants.map((r) => {
-            const ligne: Record<string, string> = { Arbitre: r.full_name };
-            optionsQuestion.forEach((o) => {
-              const entete = entetesParOption.get(o.id) ?? o.text;
-              ligne[entete] = selectionsParClef.has(`${r.attemptId}|${o.id}`) ? 'X' : '';
-            });
-            return ligne;
-          });
-
-          const feuille = XLSX.utils.json_to_sheet(lignesFeuille);
+          const feuille = XLSX.utils.aoa_to_sheet(lignesFeuille);
+          feuille['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: nbCol - 1 } }];
+          feuille['!cols'] = [{ wch: 28 }, ...opts.map(() => ({ wch: 24 })), { wch: 10 }];
+          for (let r = 2; r < lignesFeuille.length; r++) {
+            const cellule = feuille[XLSX.utils.encode_cell({ r, c: nbCol - 1 })];
+            if (cellule && cellule.t === 'n') cellule.z = '0.##" %"';
+          }
           // Excel limite les noms de feuille à 31 caractères et interdit : \ / ? * [ ]
           const nomFeuille = `Q${index + 1} - ${q.text}`.replace(/[:\\/?*[\]]/g, '').slice(0, 31);
           XLSX.utils.book_append_sheet(classeur, feuille, nomFeuille);
