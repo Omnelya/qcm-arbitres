@@ -211,7 +211,9 @@ export default function QuizResultats() {
   async function exporterExcel() {
     setExportEnCours('excel');
     try {
-      const XLSX = await import('xlsx');
+      // fork de xlsx qui sait écrire les styles (retour à la ligne, gras) ; même fonctionnement
+      const module = await import('xlsx-js-style');
+      const XLSX = module.default ?? module;
       const classeur = XLSX.utils.book_new();
 
       const feuilleSynthese = XLSX.utils.json_to_sheet(donneesExport());
@@ -257,7 +259,23 @@ export default function QuizResultats() {
           const feuille = XLSX.utils.aoa_to_sheet(lignesFeuille);
           feuille['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: nbCol - 1 } }];
           feuille['!cols'] = [{ wch: 28 }, ...opts.map(() => ({ wch: 24 })), { wch: 10 }];
+          const largeurTotale = 28 + 24 * opts.length + 10;
+          const lignesEnonce = Math.max(1, Math.ceil(q.text.length / (largeurTotale * 0.85)));
+          const lignesEntete = Math.max(1, ...opts.map((o) => Math.ceil(o.text.length / 20)));
+          feuille['!rows'] = [{ hpt: 18 * lignesEnonce + 6 }, { hpt: 16 * lignesEntete + 6 }];
+          const haut = { wrapText: true, vertical: 'center', horizontal: 'left' };
+          const fond = { fgColor: { rgb: 'E8F0EC' } };
+          const cEnonce = feuille[XLSX.utils.encode_cell({ r: 0, c: 0 })];
+          if (cEnonce) cEnonce.s = { font: { bold: true, sz: 12 }, alignment: haut, fill: fond };
+          for (let c = 0; c < nbCol; c++) {
+            const cEntete = feuille[XLSX.utils.encode_cell({ r: 1, c })];
+            if (cEntete) cEntete.s = { font: { bold: true }, alignment: { ...haut, horizontal: c === 0 ? 'left' : 'center' }, fill: fond };
+          }
           for (let r = 2; r < lignesFeuille.length; r++) {
+            for (let c = 1; c < nbCol; c++) {
+              const cc = feuille[XLSX.utils.encode_cell({ r, c })];
+              if (cc) cc.s = { alignment: { horizontal: 'center' } };
+            }
             const cellule = feuille[XLSX.utils.encode_cell({ r, c: nbCol - 1 })];
             if (cellule && cellule.t === 'n') cellule.z = '0.##" %"';
           }
