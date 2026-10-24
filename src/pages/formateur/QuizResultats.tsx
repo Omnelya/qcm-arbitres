@@ -241,10 +241,11 @@ export default function QuizResultats() {
         // Une feuille par question : ligne 1 = énoncé (fusionné), ligne 2 = « Nom Prénom » + réponses
         // possibles + « Note », puis une ligne par arbitre (y compris ceux qui n'ont pas répondu).
         questions.forEach((q, index) => {
-          const opts = q.options;
+          const opts = q.options.map((o) => ({ ...o, text: o.text.trim() }));
+          const enonce = q.text.replace(/\r\n?/g, '\n').trim();
           const nbCol = opts.length + 2;
           const lignesFeuille: (string | number | null)[][] = [
-            [q.text, ...Array(nbCol - 1).fill(null)],
+            [enonce, ...Array(nbCol - 1).fill(null)],
             ['Nom Prénom', ...opts.map((o) => o.text), 'Note'],
           ];
           const attendu = opts.filter((o) => o.is_correct).length;
@@ -260,27 +261,29 @@ export default function QuizResultats() {
           feuille['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: nbCol - 1 } }];
           feuille['!cols'] = [{ wch: 28 }, ...opts.map(() => ({ wch: 24 })), { wch: 10 }];
           const largeurTotale = 28 + 24 * opts.length + 10;
-          const lignesEnonce = Math.max(1, Math.ceil(q.text.length / (largeurTotale * 0.85)));
+          // lignes à l'écran : chaque retour à la ligne de l'énoncé compte, plus les lignes trop longues
+          const lignesEnonce = enonce.split('\n').reduce((n, l) => n + Math.max(1, Math.ceil(l.length / (largeurTotale * 0.85))), 0);
           const lignesEntete = Math.max(1, ...opts.map((o) => Math.ceil(o.text.length / 20)));
           feuille['!rows'] = [{ hpt: 18 * lignesEnonce + 6 }, { hpt: 16 * lignesEntete + 6 }];
           const haut = { wrapText: true, vertical: 'center', horizontal: 'left' };
+          const centre = { wrapText: true, vertical: 'center', horizontal: 'center' };
           const fond = { fgColor: { rgb: 'E8F0EC' } };
           const cEnonce = feuille[XLSX.utils.encode_cell({ r: 0, c: 0 })];
-          if (cEnonce) cEnonce.s = { font: { bold: true, sz: 12 }, alignment: haut, fill: fond };
+          if (cEnonce) cEnonce.s = { font: { bold: true, sz: 12 }, alignment: centre, fill: fond };
           for (let c = 0; c < nbCol; c++) {
             const cEntete = feuille[XLSX.utils.encode_cell({ r: 1, c })];
-            if (cEntete) cEntete.s = { font: { bold: true }, alignment: { ...haut, horizontal: c === 0 ? 'left' : 'center' }, fill: fond };
+            if (cEntete) cEntete.s = { font: { bold: true }, alignment: c === 0 ? haut : centre, fill: fond };
           }
           for (let r = 2; r < lignesFeuille.length; r++) {
             for (let c = 1; c < nbCol; c++) {
               const cc = feuille[XLSX.utils.encode_cell({ r, c })];
-              if (cc) cc.s = { alignment: { horizontal: 'center' } };
+              if (cc) cc.s = { alignment: { vertical: 'center', horizontal: 'center' } };
             }
             const cellule = feuille[XLSX.utils.encode_cell({ r, c: nbCol - 1 })];
             if (cellule && cellule.t === 'n') cellule.z = '0.##" %"';
           }
           // Excel limite les noms de feuille à 31 caractères et interdit : \ / ? * [ ]
-          const nomFeuille = `Q${index + 1} - ${q.text}`.replace(/[:\\/?*[\]]/g, '').slice(0, 31);
+          const nomFeuille = `Q${index + 1} - ${enonce.replace(/\s+/g, " ")}`.replace(/[:\\/?*[\]]/g, '').slice(0, 31);
           XLSX.utils.book_append_sheet(classeur, feuille, nomFeuille);
         });
       }
