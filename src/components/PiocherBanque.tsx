@@ -60,7 +60,8 @@ export default function PiocherBanque({ quizId, onAjoute }: { quizId: string; on
   useEffect(() => {
     if (!ouvert || !banqueId) return;
     supabase.rpc('banque_themes_liste', { p_banque: banqueId }).then(({ data }) => {
-      setThemes((data ?? []) as ThemeInfo[]);
+      // ordre naturel : « Règle 2 » avant « Règle 10 »
+      setThemes(((data ?? []) as ThemeInfo[]).sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true, sensitivity: 'base' })));
     });
   }, [ouvert, banqueId]);
 
@@ -122,10 +123,10 @@ export default function PiocherBanque({ quizId, onAjoute }: { quizId: string; on
     });
     setOccupe(false);
     if (error) {
-      setErreur('Le tirage a échoué. Rien n’a été ajouté, réessaie dans un instant.');
+      setErreur('L’ajout au hasard a échoué. Rien n’a été ajouté, réessaie dans un instant.');
       return;
     }
-    setInfo(`${data ?? 0} question(s) tirée(s) au hasard et ajoutée(s).`);
+    setInfo(`${data ?? 0} question(s) ajoutée(s) au hasard à ton QCM.`);
     onAjoute();
     chargerListe();
   }
@@ -222,14 +223,14 @@ export default function PiocherBanque({ quizId, onAjoute }: { quizId: string; on
               </div>
 
               <div className="bg-canvas rounded-xl p-3 mb-3 flex flex-wrap items-center gap-2 text-sm">
-                <span>Tirer au hasard</span>
+                <span>Ajouter au hasard</span>
                 <input
                   type="number"
                   min={1}
                   max={200}
                   value={nombreHasard}
                   onChange={(e) => setNombreHasard(Math.max(1, Math.min(200, Number(e.target.value) || 1)))}
-                  aria-label="Nombre de questions à tirer"
+                  aria-label="Nombre de questions à ajouter au hasard"
                   className="w-20 border border-border rounded-lg px-2 py-1"
                 />
                 <span>question(s) {filtreTheme && filtreTheme !== 'none' ? 'du thème choisi' : 'de la banque'}</span>
@@ -239,7 +240,7 @@ export default function PiocherBanque({ quizId, onAjoute }: { quizId: string; on
                   disabled={occupe}
                   className="ml-auto bg-surface border border-border rounded-xl px-3 py-1.5 font-semibold disabled:opacity-50"
                 >
-                  Tirer
+                  Ajouter
                 </button>
               </div>
 

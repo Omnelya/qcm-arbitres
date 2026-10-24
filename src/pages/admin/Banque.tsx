@@ -156,7 +156,8 @@ function DetailBanque({
         return { id: t.id as string, name: t.name as string, nb: count ?? 0 };
       })
     );
-    setThemes(lignes);
+    // ordre naturel : « Règle 2 » avant « Règle 10 »
+    setThemes(lignes.sort((a, b) => a.name.localeCompare(b.name, 'fr', { numeric: true, sensitivity: 'base' })));
     const { count } = await supabase
       .from('banque_questions')
       .select('id', { count: 'exact', head: true })
