@@ -277,7 +277,7 @@ export default function QuizResultats() {
           for (let r = 2; r < lignesFeuille.length; r++) {
             for (let c = 1; c < nbCol; c++) {
               const cc = feuille[XLSX.utils.encode_cell({ r, c })];
-              if (cc) cc.s = { alignment: { vertical: 'center', horizontal: 'center' } };
+              if (cc) cc.s = { alignment: { vertical: 'center', horizontal: 'center' }, ...(opts[c - 1]?.is_correct ? { fill: fond } : {}) };
             }
             const cellule = feuille[XLSX.utils.encode_cell({ r, c: nbCol - 1 })];
             if (cellule && cellule.t === 'n') cellule.z = '0.##" %"';
