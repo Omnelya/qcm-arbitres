@@ -4,7 +4,7 @@ const CLE = 'qcm-derniere-page';
 const DUREE_MS = 24 * 60 * 60 * 1000;
 
 // Onglets du menu seulement : jamais un QCM en cours de passage ni une fiche de détail.
-const MEMORISABLE = /^\/(?:admin(?:\/(?:comptes|structures|banque|journal|reglages))?|formateur(?:\/groupes)?|arbitre(?:\/historique)?)$/;
+const MEMORISABLE = /^\/(?:admin(?:\/(?:comptes|structures|banque|journal|reglages))?|formateur(?:\/(?:groupes|support))?|arbitre(?:\/historique)?)$/;
 
 export function memoriserPage(userId: string, chemin: string): void {
   if (!MEMORISABLE.test(chemin)) return;

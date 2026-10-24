@@ -25,6 +25,7 @@ const ESPACES: Record<AppRole, { sousTitre: string; menu: string; liens: LienMen
     liens: [
       { to: '/formateur', label: 'Mes QCM', icone: 'qcm', end: true },
       { to: '/formateur/groupes', label: 'Mes groupes', icone: 'groupes' },
+      { to: '/formateur/support', label: 'Support', icone: 'support' },
       { to: '/mon-profil', label: 'Profil', icone: 'profil' },
     ],
   },

@@ -22,6 +22,7 @@ import QuizResultats from './pages/formateur/QuizResultats';
 import AttemptDetail from './pages/formateur/AttemptDetail';
 import Groupes from './pages/formateur/Groupes';
 import GroupMembers from './pages/formateur/GroupMembers';
+import SupportCorrection from './pages/formateur/SupportCorrection';
 import ArbitreAccueil from './pages/arbitre/Dashboard';
 import QuizAttempt from './pages/arbitre/QuizAttempt';
 import QuizAttemptResult from './pages/arbitre/QuizAttemptResult';
@@ -181,6 +182,14 @@ export default function App() {
             element={
               <ProtectedRoute role="formateur">
                 <Groupes />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/formateur/support"
+            element={
+              <ProtectedRoute role="formateur">
+                <SupportCorrection />
               </ProtectedRoute>
             }
           />

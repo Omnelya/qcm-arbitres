@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 
-export type IconeMenu = 'accueil' | 'qcm' | 'groupes' | 'historique' | 'comptes' | 'structures' | 'banque' | 'journal' | 'reglages' | 'profil';
+export type IconeMenu = 'accueil' | 'qcm' | 'groupes' | 'historique' | 'comptes' | 'structures' | 'banque' | 'journal' | 'reglages' | 'profil' | 'support';
 
 export interface LienMenu {
   to: string;
@@ -21,6 +21,7 @@ const ICONES: Record<IconeMenu, JSX.Element> = {
   journal: <><path d="M6 4h12v16H6z" /><path d="M9 8h6M9 12h6M9 16h4" /></>,
   reglages: <><circle cx="12" cy="12" r="3" /><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1" /></>,
   profil: <><circle cx="12" cy="9" r="3.5" /><path d="M5 20c1.5-3.5 4-5 7-5s5.5 1.5 7 5" /></>,
+  support: <><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M12 16v4M8 20h8M8 9l3 2-3 2" /></>,
 };
 
 // Menu de chaque espace : barre d'onglets fixée en bas de l'écran sur

@@ -4,6 +4,7 @@ export interface QuestionCorrection {
   type: 'video' | 'image' | 'text';
   text: string;
   explanation: string | null;
+  moyenne?: number | null; // note moyenne des arbitres sur cette question, en %
   options: { text: string; is_correct: boolean }[];
 }
 
@@ -36,16 +37,30 @@ function policeQuiTient(texte: string, largeurPo: number, hauteurPo: number) {
   return 12;
 }
 
-export async function genererPowerPoint(synthese: SyntheseCorrection, questions: QuestionCorrection[], nomFichier: string) {
+// fond : image (adresse « data: ») qui remplace l'arrière-plan d'origine ; un voile garde le texte lisible.
+export async function genererPowerPoint(synthese: SyntheseCorrection, questions: QuestionCorrection[], nomFichier: string, fond?: string) {
   const module = await import('pptxgenjs');
   const PptxGenJS = module.default;
   const pptx = new PptxGenJS();
   pptx.layout = 'LAYOUT_WIDE'; // 13,33 x 7,5 po (16:9)
   pptx.title = synthese.titre;
 
+  // fond d'une diapositive : couleur d'origine, ou image + voile (vert foncé / blanc) pour la lisibilité
+  const habiller = (s: ReturnType<typeof pptx.addSlide>, couleur: string, voile: { couleur: string; y: number; h: number; transparence: number }) => {
+    if (!fond) {
+      s.background = { color: couleur };
+      return;
+    }
+    s.background = { data: fond };
+    s.addShape(pptx.ShapeType.rect, {
+      x: 0, y: voile.y, w: 13.33, h: voile.h, fill: { color: voile.couleur, transparency: voile.transparence }, line: { color: voile.couleur, transparency: 100 },
+    });
+  };
+  const voileVert = { couleur: VERT, y: 0, h: 7.5, transparence: 30 };
+
   // ---- Page de garde ----
   const garde = pptx.addSlide();
-  garde.background = { color: VERT };
+  habiller(garde, VERT, voileVert);
   garde.addText('Correction du QCM', { x: 0.8, y: 0.9, w: 11.7, h: 0.6, fontSize: 22, color: 'CFE3D8', fontFace: 'Calibri' });
   garde.addText(synthese.titre, {
     x: 0.8, y: 1.6, w: 11.7, h: 2.2, fontSize: taille(synthese.titre, 44, 36, 28, 50, 100),
@@ -69,28 +84,37 @@ export async function genererPowerPoint(synthese: SyntheseCorrection, questions:
   const total = questions.length;
   questions.forEach((q, index) => {
     const enonce = q.text.replace(/\r\n?/g, '\n').trim();
-    const police = policeQuiTient(enonce, 12.1, 1.95);
+    // énoncé long : la zone du texte grandit (jusqu'à 3,1 po) au détriment des réponses
+    const hEnonce = policeQuiTient(enonce, 12.1, 1.95) >= 18 ? 1.95 : 3.1;
+    const police = policeQuiTient(enonce, 12.1, hEnonce);
+    const yOpt = 0.95 + hEnonce;
+    const finOpt = q.explanation?.trim() ? 5.65 : 7.2;
     const nbOpt = Math.max(1, q.options.length);
-    const hauteurLigne = Math.min(0.8, 2.7 / nbOpt);
+    const hauteurLigne = Math.min(0.85, (finOpt - yOpt) / nbOpt);
     const tousTextes = q.options.map((o) => o.text).join(' ');
-    const policeOpt = nbOpt > 5 || tousTextes.length > 400 ? 15 : nbOpt > 4 || tousTextes.length > 250 ? 18 : 20;
+    const policeOpt = nbOpt > 6 || tousTextes.length > 900 ? 15 : nbOpt > 5 || tousTextes.length > 450 ? 18 : 20;
     const media = q.type === 'video' ? 'Question vidéo' : q.type === 'image' ? 'Question image' : '';
 
     for (const correction of [false, true]) {
       const s = pptx.addSlide();
-      s.background = { color: 'FFFFFF' };
+      habiller(s, 'FFFFFF', { couleur: 'FFFFFF', y: 0.7, h: 6.8, transparence: 12 });
       s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.7, fill: { color: VERT }, line: { color: VERT } });
       s.addText(`Question ${index + 1} / ${total}${media ? ' · ' + media : ''}`, {
-        x: 0.5, y: 0, w: 9, h: 0.7, fontSize: 18, bold: true, color: 'FFFFFF', fontFace: 'Calibri', valign: 'middle',
+        x: 0.5, y: 0, w: 5.6, h: 0.7, fontSize: 18, bold: true, color: 'FFFFFF', fontFace: 'Calibri', valign: 'middle',
       });
+      if (q.moyenne != null) {
+        s.addText(`Moyenne : ${pct(q.moyenne)}`, {
+          x: 6.0, y: 0, w: 3.2, h: 0.7, fontSize: 18, bold: true, color: 'FFFFFF', fontFace: 'Calibri', align: 'right', valign: 'middle',
+        });
+      }
       s.addText(correction ? 'Correction' : 'Réponses', {
         x: 9.3, y: 0, w: 3.6, h: 0.7, fontSize: 16, color: 'CFE3D8', fontFace: 'Calibri', align: 'right', valign: 'middle',
       });
-      s.addText(enonce, { x: 0.5, y: 0.85, w: 12.3, h: 1.95, fontSize: police, bold: true, color: TEXTE, fontFace: 'Calibri', valign: 'top' });
+      s.addText(enonce, { x: 0.5, y: 0.85, w: 12.3, h: hEnonce, fontSize: police, bold: true, color: TEXTE, fontFace: 'Calibri', valign: 'top' });
 
       // mêmes emplacements sur les deux diapositives ; en correction, les mauvaises réponses restent vides
       q.options.forEach((o, i) => {
-        const y = 2.9 + i * hauteurLigne;
+        const y = yOpt + i * hauteurLigne;
         if (correction && !o.is_correct) return;
         s.addShape(pptx.ShapeType.roundRect, {
           x: 0.5, y, w: 12.3, h: hauteurLigne - 0.1,
@@ -113,7 +137,7 @@ export async function genererPowerPoint(synthese: SyntheseCorrection, questions:
   // ---- Questions ? / Remerciements ----
   for (const texte of ['Questions ?', 'Merci de votre attention']) {
     const s = pptx.addSlide();
-    s.background = { color: VERT };
+    habiller(s, VERT, voileVert);
     s.addText(texte, { x: 0.8, y: 2.6, w: 11.7, h: 1.6, align: 'center', valign: 'middle', fontSize: 54, bold: true, color: 'FFFFFF', fontFace: 'Calibri' });
     s.addText(synthese.titre, { x: 0.8, y: 4.4, w: 11.7, h: 0.8, align: 'center', fontSize: 20, color: 'CFE3D8', fontFace: 'Calibri' });
   }
