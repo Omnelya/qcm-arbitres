@@ -32,6 +32,39 @@ export function oublierPage(): void {
   try {
     localStorage.removeItem(CLE);
     localStorage.removeItem(CLE_BANQUE);
+    // toutes les mémoires « génériques » (brouillons de question, fenêtres ouvertes…)
+    for (const k of Object.keys(localStorage)) if (k.startsWith(PREFIXE)) localStorage.removeItem(k);
+  } catch {
+    // rien à faire
+  }
+}
+
+// Mémoire générique : une valeur par clé, liée à la personne connectée, valable 24 h,
+// effacée à la déconnexion (voir oublierPage).
+const PREFIXE = 'qcm-memoire:';
+
+export function memoriser(cle: string, userId: string, valeur: unknown): void {
+  try {
+    localStorage.setItem(PREFIXE + cle, JSON.stringify({ userId, valeur, le: Date.now() }));
+  } catch {
+    // stockage plein ou bloqué : on ne retient rien
+  }
+}
+
+export function memorisee<T>(cle: string, userId: string): T | null {
+  try {
+    const brut = localStorage.getItem(PREFIXE + cle);
+    if (!brut) return null;
+    const { userId: u, valeur, le } = JSON.parse(brut) as { userId: string; valeur: T; le: number };
+    return u === userId && Date.now() - le <= DUREE_MS ? valeur : null;
+  } catch {
+    return null;
+  }
+}
+
+export function oublier(cle: string): void {
+  try {
+    localStorage.removeItem(PREFIXE + cle);
   } catch {
     // rien à faire
   }

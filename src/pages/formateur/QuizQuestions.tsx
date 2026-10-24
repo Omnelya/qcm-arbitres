@@ -1,14 +1,18 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useParams } from 'react-router-dom';
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import AppLayout from '../../components/AppLayout';
 import QuizTabs from '../../components/QuizTabs';
-import PiocherBanque from '../../components/PiocherBanque';
+import PiocherBanque, { type BanqueInfo } from '../../components/PiocherBanque';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import { useCouleurStructureEcran, useStructuresQcm } from '../../hooks/useCouleurQcm';
 import { useSuspendreDeconnexionInactivite } from '../../lib/inactivite';
 import { extraireErreurFonction } from '../../lib/functionsError';
 import { avecRetriesTimeout } from '../../lib/retryTimeout';
+import { memorisee, memoriser, oublier } from '../../lib/dernierePage';
 
 type QuestionType = 'video' | 'image' | 'text';
 
@@ -42,6 +46,19 @@ interface EnvoiEnCours {
   ordreIndex: number;
 }
 
+// Ce qui est retenu de la question en cours de saisie (nouvelle ou modifiée), pour la retrouver
+// exactement là où on l'a laissée après un rechargement ou un changement de page.
+interface Brouillon {
+  type: QuestionType;
+  texte: string;
+  explication: string;
+  options: AnswerOption[];
+  editId: string | null;
+  haut: number;
+}
+
+type Panneau = 'choix' | 'question' | 'banque' | null;
+
 const TYPE_LABELS: Record<QuestionType, string> = {
   video: 'Vidéo',
   image: 'Image',
@@ -52,6 +69,55 @@ function nouvelleOption(): AnswerOption {
   return { id: crypto.randomUUID(), text: '', is_correct: false };
 }
 
+// Une carte de question déplaçable par sa poignée « burger » (souris, doigt ou clavier).
+function LigneTriable({
+  id,
+  className,
+  actif,
+  etiquette,
+  enfant,
+}: {
+  id: string;
+  className: string;
+  actif: boolean;
+  etiquette: string;
+  enfant: (poignee: ReactNode) => ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: !actif,
+  });
+  const poignee = actif ? (
+    <button
+      type="button"
+      ref={setActivatorNodeRef}
+      aria-label={etiquette}
+      {...attributes}
+      {...listeners}
+      className="touch-none shrink-0 -ml-1 p-1.5 text-muted cursor-grab active:cursor-grabbing rounded hover:bg-canvas"
+    >
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+        <path d="M4 7h16M4 12h16M4 17h16" />
+      </svg>
+    </button>
+  ) : null;
+  return (
+    <li
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        position: 'relative',
+        zIndex: isDragging ? 10 : undefined,
+        opacity: isDragging ? 0.7 : 1,
+      }}
+      className={className}
+    >
+      {enfant(poignee)}
+    </li>
+  );
+}
+
 export default function QuizQuestions() {
   const { id: quizId } = useParams();
   // Éléments verts de l'écran aux couleurs de la structure du QCM
@@ -59,12 +125,34 @@ export default function QuizQuestions() {
 
   const [questions, setQuestions] = useState<QuestionRow[]>([]);
   const [statutQcm, setStatutQcm] = useState<'draft' | 'published' | null>(null);
-  const { roles } = useAuth();
+  const { roles, session } = useAuth();
+  const userId = session?.user.id;
   const estAdmin = roles.includes('admin');
   const [proposerBanque, setProposerBanque] = useState<string | null>(null); // id de la question modifiée
   const [majBanqueEnCours, setMajBanqueEnCours] = useState(false);
   const [erreurBanque, setErreurBanque] = useState<string | null>(null);
   const [infoBanque, setInfoBanque] = useState<string | null>(null);
+
+  // Fenêtre ouverte (retenue : on la retrouve ouverte après un rechargement)
+  const clePanneau = `panneau:${quizId}`;
+  const [panneau, setPanneau] = useState<Panneau>(() => {
+    const p = userId ? memorisee<Panneau>(clePanneau, userId) : null;
+    return p === 'question' || p === 'banque' ? p : null;
+  });
+  const [banques, setBanques] = useState<BanqueInfo[]>([]);
+
+  useEffect(() => {
+    if (!userId) return;
+    if (panneau === 'question' || panneau === 'banque') memoriser(clePanneau, userId, panneau);
+    else if (panneau === null) oublier(clePanneau);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panneau]);
+
+  useEffect(() => {
+    supabase.rpc('banque_liste').then(({ data, error }) => {
+      if (!error && data) setBanques(data as BanqueInfo[]);
+    });
+  }, []);
 
   async function mettreAJourBanque() {
     if (!proposerBanque) return;
@@ -126,50 +214,83 @@ export default function QuizQuestions() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizId]);
 
-  // Brouillon de la NOUVELLE question, gardé dans le navigateur au fil de la
-  // saisie : un onglet rechargé par le navigateur (téléphone surtout) ne fait
-  // plus perdre le texte. shortcut: brouillon local à l'appareil, sans fichier
-  // vidéo/image ni modification d'une question existante ; passer à la base si
-  // un brouillon multi-appareils est demandé.
-  const cleBrouillon = `brouillon-question:${quizId}`;
+  // Brouillon de la question en cours (nouvelle ou modifiée), gardé dans le navigateur au fil de la
+  // saisie : un onglet rechargé ou quitté ne fait plus perdre le texte. Retenu jusqu'à la
+  // déconnexion, 24 h au maximum. shortcut: local à l'appareil, sans fichier vidéo/image ;
+  // passer à la base si un brouillon multi-appareils est demandé.
+  const cleBrouillon = `brouillon:${quizId}`;
   const [brouillonPret, setBrouillonPret] = useState(false);
   const [brouillonRestaure, setBrouillonRestaure] = useState(false);
+  const zoneForm = useRef<HTMLDivElement>(null);
+  const hautForm = useRef(0);
+  const hautFormARestaurer = useRef<number | null>(null);
 
   useEffect(() => {
     setBrouillonPret(false);
-    try {
-      const b = JSON.parse(localStorage.getItem(cleBrouillon) ?? 'null');
-      if (b && typeof b.texte === 'string' && Array.isArray(b.options) && b.options.length >= 2) {
-        setType(b.type === 'video' || b.type === 'image' ? b.type : 'text');
-        setTexte(b.texte);
-        setExplication(typeof b.explication === 'string' ? b.explication : '');
-        setOptions(
-          b.options.map((o: Partial<AnswerOption>) => ({
-            id: typeof o.id === 'string' ? o.id : crypto.randomUUID(),
-            text: String(o.text ?? ''),
-            is_correct: !!o.is_correct,
-          }))
-        );
-        setBrouillonRestaure(true);
-      }
-    } catch {
-      // stockage indisponible ou brouillon illisible : on repart d'un formulaire vide
+    const b = userId ? memorisee<Brouillon>(cleBrouillon, userId) : null;
+    if (b && typeof b.texte === 'string' && Array.isArray(b.options) && b.options.length >= 2) {
+      setType(b.type === 'video' || b.type === 'image' ? b.type : 'text');
+      setTexte(b.texte);
+      setExplication(typeof b.explication === 'string' ? b.explication : '');
+      setOptions(
+        b.options.map((o: Partial<AnswerOption>) => ({
+          id: typeof o.id === 'string' ? o.id : crypto.randomUUID(),
+          text: String(o.text ?? ''),
+          is_correct: !!o.is_correct,
+        }))
+      );
+      setQuestionEnEditionId(typeof b.editId === 'string' ? b.editId : null);
+      hautForm.current = typeof b.haut === 'number' ? b.haut : 0;
+      hautFormARestaurer.current = hautForm.current;
+      setBrouillonRestaure(true);
     }
     setBrouillonPret(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quizId]);
 
+  function sauverBrouillon() {
+    if (!brouillonPret || !userId) return;
+    const vide = !texte.trim() && !explication.trim() && options.every((o) => !o.text.trim());
+    if (vide && !questionEnEditionId) oublier(cleBrouillon);
+    else
+      memoriser(cleBrouillon, userId, {
+        type,
+        texte,
+        explication,
+        options,
+        editId: questionEnEditionId,
+        haut: hautForm.current,
+      } satisfies Brouillon);
+  }
+
   useEffect(() => {
-    if (!brouillonPret || !quizId) return;
-    try {
-      const vide = !texte.trim() && !explication.trim() && options.every((o) => !o.text.trim());
-      if (questionEnEditionId || vide) localStorage.removeItem(cleBrouillon);
-      else localStorage.setItem(cleBrouillon, JSON.stringify({ type, texte, explication, options }));
-    } catch {
-      // stockage plein ou bloqué : pas de brouillon, le formulaire reste utilisable
-    }
+    sauverBrouillon();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [brouillonPret, questionEnEditionId, type, texte, explication, options]);
+
+  // retour sur la fenêtre de la question : on retrouve la position de défilement
+  useEffect(() => {
+    if (panneau === 'question' && hautFormARestaurer.current != null && zoneForm.current) {
+      zoneForm.current.scrollTop = hautFormARestaurer.current;
+      hautFormARestaurer.current = null;
+    }
+  }, [panneau]);
+
+  // Question en cours de modification retrouvée après un rechargement : on la raccroche à la liste
+  // (fichier actuel) ou on l'abandonne si elle n'existe plus.
+  useEffect(() => {
+    if (loading || !questionEnEditionId) return;
+    const q = questions.find((x) => x.id === questionEnEditionId);
+    if (!q) {
+      reinitialiserFormulaire();
+      setPanneau(null);
+      return;
+    }
+    if (mediaKeyExistant === null && type !== 'text' && !fichier && q.media_url && q.type === type) {
+      setMediaKeyExistant(q.media_url);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, questions, questionEnEditionId]);
 
   function choisirFichier(f: File | null) {
     setFichier(f);
@@ -197,10 +318,25 @@ export default function QuizQuestions() {
     setOptions([nouvelleOption(), nouvelleOption()]);
     setMediaKeyExistant(null);
     choisirFichier(null);
+    hautForm.current = 0;
+  }
+
+  function ouvrirNouvelle() {
+    setErreurForm(null);
+    if (questionEnEditionId) reinitialiserFormulaire();
+    setPanneau('question');
+  }
+
+  // Fermer la fenêtre : une nouvelle question en cours reste en brouillon, une modification est abandonnée.
+  function fermerQuestion() {
+    if (questionEnEditionId) reinitialiserFormulaire();
+    setPanneau(null);
   }
 
   async function commencerEdition(q: QuestionRow) {
     setErreurForm(null);
+    setBrouillonRestaure(false);
+    hautForm.current = 0;
     setQuestionEnEditionId(q.id);
     setType(q.type);
     setTexte(q.text);
@@ -213,6 +349,7 @@ export default function QuizQuestions() {
     setFichier(null);
     setApercu(null);
     setMediaKeyExistant(q.media_url);
+    setPanneau('question');
 
     if (q.media_url === '__deleted__') {
       setErreurForm(
@@ -230,8 +367,6 @@ export default function QuizQuestions() {
       }
       setChargementApercu(false);
     }
-
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }
 
   // Envoie UN fichier donné vers R2, en rapportant sa progression via le
@@ -297,7 +432,7 @@ export default function QuizQuestions() {
   }
 
   // Envoie le média et enregistre la question en tâche de fond, sans
-  // bloquer le formulaire (qui a déjà été réinitialisé pour la suivante).
+  // bloquer la page (la fenêtre de saisie est déjà fermée).
   async function lancerEnvoiEnArrierePlan(job: EnvoiEnCours) {
     try {
       const mediaKey = await televerserMedia(job.fichier, (p) => {
@@ -366,6 +501,7 @@ export default function QuizQuestions() {
         const questionModifiee = questionEnEditionId;
         await enregistrerQuestionEnBase(mediaKey, type, texte, explication, optionsRemplies, questionModifiee, 0);
         reinitialiserFormulaire();
+        setPanneau(null);
         await charger();
         // Administrateur : si la question vient de la banque et diffère d'elle, on propose de mettre la banque à jour.
         if (estAdmin) {
@@ -383,8 +519,8 @@ export default function QuizQuestions() {
       return;
     }
 
-    // Nouvelle question avec un fichier : envoi en arrière-plan, le
-    // formulaire se libère immédiatement pour la question suivante.
+    // Nouvelle question avec un fichier : envoi en arrière-plan, la
+    // fenêtre se ferme immédiatement.
     if (fichier) {
       const job: EnvoiEnCours = {
         id: crypto.randomUUID(),
@@ -399,6 +535,7 @@ export default function QuizQuestions() {
       };
       setEnvoisEnCours((prev) => [...prev, job]);
       reinitialiserFormulaire();
+      setPanneau(null);
       lancerEnvoiEnArrierePlan(job);
       return;
     }
@@ -408,6 +545,7 @@ export default function QuizQuestions() {
     try {
       await enregistrerQuestionEnBase(null, type, texte, explication, optionsRemplies, null, questions.length + envoisEnCours.length);
       reinitialiserFormulaire();
+      setPanneau(null);
       await charger();
     } catch (err) {
       setErreurForm(err instanceof Error ? err.message : 'Une erreur est survenue.');
@@ -422,10 +560,44 @@ export default function QuizQuestions() {
     await charger();
   }
 
+  // Glisser-déposer : souris, doigt (poignée « burger ») ou clavier.
+  const capteurs = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  async function apresDeplacement(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id || !quizId) return;
+    const ancien = questions.findIndex((q) => q.id === active.id);
+    const nouveau = questions.findIndex((q) => q.id === over.id);
+    if (ancien < 0 || nouveau < 0) return;
+    const suite = arrayMove(questions, ancien, nouveau);
+    setQuestions(suite);
+    const { error } = await supabase.rpc('reordonner_questions', { p_quiz: quizId, p_ordre: suite.map((q) => q.id) });
+    if (error) {
+      setErreurListe('Le nouvel ordre n’a pas pu être enregistré. Réessaie dans un instant.');
+      await charger();
+    }
+  }
+
+  const brouillonOuvert = statutQcm !== 'published';
+
   return (
     <AppLayout>
       {quizId && <QuizTabs quizId={quizId} />}
-      <h1 className="text-lg font-semibold mb-4">Questions</h1>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h1 className="text-lg font-semibold">Questions</h1>
+        {brouillonOuvert && (
+          <button
+            type="button"
+            onClick={() => setPanneau('choix')}
+            className="shrink-0 bg-pitch text-white text-sm font-semibold rounded-xl px-3 py-2"
+          >
+            + Ajouter une question
+          </button>
+        )}
+      </div>
 
       {infoBanque && <p className="text-sm text-pitch mb-4">{infoBanque}</p>}
       {loading && <p className="text-sm text-muted">Chargement…</p>}
@@ -462,6 +634,10 @@ export default function QuizQuestions() {
         </div>
       )}
 
+      {!loading && questions.length === 0 && brouillonOuvert && (
+        <p className="text-sm text-muted mb-6">Aucune question pour le moment. Utilise « Ajouter une question » en haut à droite.</p>
+      )}
+
       {!loading && questions.length > 0 && (
         <>
           <button
@@ -476,252 +652,320 @@ export default function QuizQuestions() {
             {questionsDepliees.size === questions.length ? 'Tout replier' : 'Tout déplier'}
           </button>
 
-          <ul className="flex flex-col gap-2 mb-6">
-          {questions.map((q, i) => (
-            <li
-              key={q.id}
-              className={
-                'bg-surface border rounded p-3 ' +
-                (questionEnEditionId === q.id ? 'border-pitch' : 'border-border')
-              }
-            >
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <p className="text-xs text-muted mb-1">
-                    Question {i + 1} · {TYPE_LABELS[q.type]}
-                  </p>
-                  <p className="text-sm font-medium">{q.text}</p>
-                  <p className="text-xs text-muted mt-1">
-                    {q.options.filter((o) => o.is_correct).length} bonne(s) réponse(s) sur{' '}
-                    {q.options.length}
-                  </p>
-                </div>
-                {statutQcm !== 'published' && (
-                  <div className="flex gap-3 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => commencerEdition(q)}
-                      className="text-xs text-pitch font-medium"
-                    >
-                      Modifier
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => supprimerQuestion(q.id)}
-                      className="text-xs text-card-red"
-                    >
-                      Supprimer
-                    </button>
-                  </div>
-                )}
-              </div>
+          <DndContext sensors={capteurs} collisionDetection={closestCenter} onDragEnd={apresDeplacement}>
+            <SortableContext items={questions.map((q) => q.id)} strategy={verticalListSortingStrategy}>
+              <ul className="flex flex-col gap-2 mb-6">
+                {questions.map((q, i) => (
+                  <LigneTriable
+                    key={q.id}
+                    id={q.id}
+                    actif={brouillonOuvert}
+                    etiquette={`Déplacer la question ${i + 1}`}
+                    className={
+                      'bg-surface border rounded p-3 ' + (questionEnEditionId === q.id ? 'border-pitch' : 'border-border')
+                    }
+                    enfant={(poignee) => (
+                      <div className="flex items-start gap-2">
+                        {poignee}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <p className="text-xs text-muted mb-1">
+                                Question {i + 1} · {TYPE_LABELS[q.type]}
+                              </p>
+                              <p className="text-sm font-medium">{q.text}</p>
+                              <p className="text-xs text-muted mt-1">
+                                {q.options.filter((o) => o.is_correct).length} bonne(s) réponse(s) sur {q.options.length}
+                              </p>
+                            </div>
+                            {brouillonOuvert && (
+                              <div className="flex gap-3 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => commencerEdition(q)}
+                                  className="text-xs text-pitch font-medium"
+                                >
+                                  Modifier
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => supprimerQuestion(q.id)}
+                                  className="text-xs text-card-red"
+                                >
+                                  Supprimer
+                                </button>
+                              </div>
+                            )}
+                          </div>
 
-              <button
-                type="button"
-                onClick={() =>
-                  setQuestionsDepliees((prev) => {
-                    const suivant = new Set(prev);
-                    suivant.has(q.id) ? suivant.delete(q.id) : suivant.add(q.id);
-                    return suivant;
-                  })
-                }
-                className="text-xs text-muted underline mt-2"
-              >
-                {questionsDepliees.has(q.id) ? 'Masquer les réponses' : 'Voir les réponses'}
-              </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setQuestionsDepliees((prev) => {
+                                const suivant = new Set(prev);
+                                suivant.has(q.id) ? suivant.delete(q.id) : suivant.add(q.id);
+                                return suivant;
+                              })
+                            }
+                            className="text-xs text-muted underline mt-2"
+                          >
+                            {questionsDepliees.has(q.id) ? 'Masquer les réponses' : 'Voir les réponses'}
+                          </button>
 
-              {questionsDepliees.has(q.id) && (
-                <div className="mt-2 pt-2 border-t border-border">
-                  {q.type !== 'text' && q.media_url && q.media_url !== '__deleted__' && (
-                    <div className="mb-2">
-                      {mediaUrlsApercu[q.id] ? (
-                        q.type === 'video' ? (
-                          <video src={mediaUrlsApercu[q.id]} controls className="w-full rounded max-h-40" />
-                        ) : (
-                          <img src={mediaUrlsApercu[q.id]} alt="" className="w-full rounded max-h-40 object-contain" />
-                        )
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => afficherMediaApercu(q)}
-                          disabled={chargementMediaApercu === q.id}
-                          className="text-xs border border-border rounded px-3 py-1.5"
-                        >
-                          {chargementMediaApercu === q.id
-                            ? 'Chargement…'
-                            : q.type === 'video'
-                              ? 'Revoir la vidéo'
-                              : "Revoir l'image"}
-                        </button>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex flex-col gap-1.5">
-                    {q.options.map((o) => (
-                      <div
-                        key={o.id}
-                        className={
-                          'flex items-center gap-2 border rounded px-3 py-2 text-sm ' +
-                          (o.is_correct ? 'border-pitch bg-pitch-light' : 'border-border')
-                        }
-                      >
-                        <input type="checkbox" checked={o.is_correct} disabled readOnly />
-                        <span className="flex-1">{o.text}</span>
+                          {questionsDepliees.has(q.id) && (
+                            <div className="mt-2 pt-2 border-t border-border">
+                              {q.type !== 'text' && q.media_url && q.media_url !== '__deleted__' && (
+                                <div className="mb-2">
+                                  {mediaUrlsApercu[q.id] ? (
+                                    q.type === 'video' ? (
+                                      <video src={mediaUrlsApercu[q.id]} controls className="w-full rounded max-h-40" />
+                                    ) : (
+                                      <img src={mediaUrlsApercu[q.id]} alt="" className="w-full rounded max-h-40 object-contain" />
+                                    )
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => afficherMediaApercu(q)}
+                                      disabled={chargementMediaApercu === q.id}
+                                      className="text-xs border border-border rounded px-3 py-1.5"
+                                    >
+                                      {chargementMediaApercu === q.id
+                                        ? 'Chargement…'
+                                        : q.type === 'video'
+                                          ? 'Revoir la vidéo'
+                                          : "Revoir l'image"}
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                              <div className="flex flex-col gap-1.5">
+                                {q.options.map((o) => (
+                                  <div
+                                    key={o.id}
+                                    className={
+                                      'flex items-center gap-2 border rounded px-3 py-2 text-sm ' +
+                                      (o.is_correct ? 'border-pitch bg-pitch-light' : 'border-border')
+                                    }
+                                  >
+                                    <input type="checkbox" checked={o.is_correct} disabled readOnly />
+                                    <span className="flex-1">{o.text}</span>
+                                  </div>
+                                ))}
+                              </div>
+                              {q.explanation && <p className="text-xs text-muted mt-2">Explication : {q.explanation}</p>}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    ))}
-                  </div>
-                  {q.explanation && (
-                    <p className="text-xs text-muted mt-2">Explication : {q.explanation}</p>
-                  )}
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
+                    )}
+                  />
+                ))}
+              </ul>
+            </SortableContext>
+          </DndContext>
         </>
       )}
 
-      {statutQcm === 'published' ? (
+      {statutQcm === 'published' && (
         <p className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2">
           Ce QCM est publié : les questions ne peuvent plus être modifiées.
         </p>
-      ) : (
-      <>
-      {quizId && <PiocherBanque quizId={quizId} onAjoute={charger} />}
-      <form onSubmit={enregistrerQuestion} className="bg-surface border border-border rounded p-4">
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium">
-            {questionEnEditionId ? 'Modifier la question' : 'Nouvelle question'}
-          </p>
-          {questionEnEditionId && (
-            <button type="button" onClick={reinitialiserFormulaire} className="text-xs text-muted underline">
-              Annuler
-            </button>
-          )}
-        </div>
+      )}
 
-        {brouillonRestaure && !questionEnEditionId && (
-          <p className="text-xs text-muted bg-canvas rounded-lg px-3 py-2 mb-3">
-            Brouillon retrouvé : ta question en cours a été restaurée. Si elle contenait une vidéo ou une image, choisis-la de nouveau.
-          </p>
-        )}
-
-        <div className="flex gap-2 mb-4">
-          {(['video', 'image', 'text'] as QuestionType[]).map((t) => (
-            <button
-              type="button"
-              key={t}
-              onClick={() => {
-                setType(t);
-                choisirFichier(null);
-                setMediaKeyExistant(null);
-              }}
-              className={
-                'flex-1 text-sm rounded py-1.5 border ' +
-                (type === t ? 'bg-pitch text-white border-pitch' : 'border-border text-muted')
-              }
-            >
-              {TYPE_LABELS[t]}
-            </button>
-          ))}
-        </div>
-
-        {type !== 'text' && (
-          <div className="mb-4">
-            <label className="block text-sm text-muted mb-1">
-              {type === 'video' ? 'Vidéo' : 'Image'}
-              {mediaKeyExistant && !fichier && ' (fichier actuel conservé si tu n’en choisis pas un nouveau)'}
-            </label>
-            <input
-              type="file"
-              accept={type === 'video' ? 'video/*' : 'image/*'}
-              onChange={(e) => choisirFichier(e.target.files?.[0] ?? null)}
-              className="w-full text-sm"
-            />
-            {chargementApercu && <p className="text-xs text-muted mt-2">Chargement de l’aperçu…</p>}
-            {apercu && type === 'image' && (
-              <img src={apercu} alt="Aperçu" className="mt-2 rounded max-h-40" />
-            )}
-            {apercu && type === 'video' && (
-              <video src={apercu} controls className="mt-2 rounded max-h-40 w-full" />
-            )}
-            {fichier && !questionEnEditionId && (
-              <p className="text-xs text-muted mt-2">
-                L'envoi se fera en arrière-plan : tu peux enchaîner sur la question suivante dès l'enregistrement.
-              </p>
-            )}
-          </div>
-        )}
-
-        <label className="block text-sm text-muted mb-1">Question</label>
-        <textarea
-          required
-          value={texte}
-          onChange={(e) => setTexte(e.target.value)}
-          className="w-full border border-border rounded px-3 py-2 mb-4 min-h-[3rem]"
-        />
-
-        <label className="block text-sm text-muted mb-2">
-          Réponses — coche la ou les bonnes
-        </label>
-        <div className="flex flex-col gap-2 mb-2">
-          {options.map((o) => (
-            <div key={o.id} className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={o.is_correct}
-                onChange={(e) => modifierOption(o.id, { is_correct: e.target.checked })}
-              />
-              <input
-                type="text"
-                value={o.text}
-                onChange={(e) => modifierOption(o.id, { text: e.target.value })}
-                className="flex-1 border border-border rounded px-3 py-1.5 text-sm"
-              />
+      {/* Choix : écrire une question ou piocher dans la banque */}
+      {panneau === 'choix' && brouillonOuvert && (
+        <div className="fixed inset-0 z-50 bg-ink/45 flex items-center justify-center p-4" onClick={() => setPanneau(null)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titre-choix"
+            className="bg-surface rounded-2xl shadow-carte-haute w-full max-w-sm p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p id="titre-choix" className="font-bold mb-3">
+              Ajouter une question
+            </p>
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
-                onClick={() => retirerOption(o.id)}
-                className="text-xs text-muted"
+                autoFocus
+                onClick={ouvrirNouvelle}
+                className="bg-pitch text-white rounded-xl py-2.5 text-sm font-semibold"
               >
-                ✕
+                Écrire une question
+              </button>
+              {banques.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPanneau('banque')}
+                  className="bg-canvas rounded-xl py-2.5 text-sm font-semibold"
+                >
+                  Piocher dans la banque de questions
+                </button>
+              )}
+              <button type="button" onClick={() => setPanneau(null)} className="text-sm text-muted underline mt-1">
+                Annuler
               </button>
             </div>
-          ))}
+          </div>
         </div>
-        <button type="button" onClick={ajouterOption} className="text-sm text-muted mb-4">
-          + Ajouter une réponse
-        </button>
+      )}
 
-        <p className="text-xs text-muted mb-1">
-          L'arbitre pourra cocher autant de cases que de bonnes réponses cochées ci-dessus.
-        </p>
-
-        <label className="block text-sm text-muted mb-1 mt-3">Explication (optionnelle)</label>
-        <textarea
-          value={explication}
-          onChange={(e) => setExplication(e.target.value)}
-          className="w-full border border-border rounded px-3 py-2 mb-4 min-h-[2.5rem]"
+      {/* Piocher dans la banque */}
+      {quizId && brouillonOuvert && (
+        <PiocherBanque
+          quizId={quizId}
+          banques={banques}
+          ouvert={panneau === 'banque'}
+          onFermer={() => setPanneau(null)}
+          onAjoute={charger}
         />
+      )}
 
-        {erreurForm && (
-          <p role="alert" className="text-sm text-card-red bg-card-red-bg rounded px-3 py-2 mb-3">
-            {erreurForm}
-          </p>
-        )}
+      {/* Saisie d'une question (nouvelle ou modifiée) */}
+      {panneau === 'question' && brouillonOuvert && (
+        <div className="fixed inset-0 z-50 bg-ink/45 flex items-end sm:items-center justify-center sm:p-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titre-question"
+            className="bg-surface rounded-t-2xl sm:rounded-2xl shadow-carte-haute w-full max-w-2xl max-h-[92vh] flex flex-col"
+          >
+            <div className="p-4 border-b border-border flex items-center justify-between gap-3">
+              <p id="titre-question" className="font-bold">
+                {questionEnEditionId ? 'Modifier la question' : 'Nouvelle question'}
+              </p>
+              <button type="button" onClick={fermerQuestion} className="text-sm text-muted underline">
+                {questionEnEditionId ? 'Annuler' : 'Fermer'}
+              </button>
+            </div>
 
-        <button
-          type="submit"
-          disabled={enregistrement}
-          className="w-full bg-pitch text-white font-medium rounded py-2 disabled:opacity-60"
-        >
-          {enregistrement
-            ? 'Enregistrement…'
-            : questionEnEditionId
-              ? 'Enregistrer les modifications'
-              : 'Enregistrer la question'}
-        </button>
-      </form>
-      </>
+            <form onSubmit={enregistrerQuestion} className="flex flex-col min-h-0 flex-1">
+              <div
+                ref={zoneForm}
+                className="p-4 overflow-y-auto flex-1"
+                onScroll={(e) => {
+                  hautForm.current = e.currentTarget.scrollTop;
+                  sauverBrouillon();
+                }}
+              >
+                {brouillonRestaure && (
+                  <p className="text-xs text-muted bg-canvas rounded-lg px-3 py-2 mb-3">
+                    {questionEnEditionId
+                      ? 'Modifications retrouvées : tu reprends là où tu t’étais arrêté. Si tu avais choisi une nouvelle vidéo ou image, choisis-la de nouveau.'
+                      : 'Brouillon retrouvé : ta question en cours a été restaurée. Si elle contenait une vidéo ou une image, choisis-la de nouveau.'}
+                  </p>
+                )}
+
+                <div className="flex gap-2 mb-4">
+                  {(['video', 'image', 'text'] as QuestionType[]).map((t) => (
+                    <button
+                      type="button"
+                      key={t}
+                      onClick={() => {
+                        setType(t);
+                        choisirFichier(null);
+                        setMediaKeyExistant(null);
+                      }}
+                      className={
+                        'flex-1 text-sm rounded py-1.5 border ' +
+                        (type === t ? 'bg-pitch text-white border-pitch' : 'border-border text-muted')
+                      }
+                    >
+                      {TYPE_LABELS[t]}
+                    </button>
+                  ))}
+                </div>
+
+                {type !== 'text' && (
+                  <div className="mb-4">
+                    <label className="block text-sm text-muted mb-1">
+                      {type === 'video' ? 'Vidéo' : 'Image'}
+                      {mediaKeyExistant && !fichier && ' (fichier actuel conservé si tu n’en choisis pas un nouveau)'}
+                    </label>
+                    <input
+                      type="file"
+                      accept={type === 'video' ? 'video/*' : 'image/*'}
+                      onChange={(e) => choisirFichier(e.target.files?.[0] ?? null)}
+                      className="w-full text-sm"
+                    />
+                    {chargementApercu && <p className="text-xs text-muted mt-2">Chargement de l’aperçu…</p>}
+                    {apercu && type === 'image' && <img src={apercu} alt="Aperçu" className="mt-2 rounded max-h-40" />}
+                    {apercu && type === 'video' && <video src={apercu} controls className="mt-2 rounded max-h-40 w-full" />}
+                    {fichier && !questionEnEditionId && (
+                      <p className="text-xs text-muted mt-2">
+                        L'envoi se fera en arrière-plan : la fenêtre se fermera dès l'enregistrement et la progression s'affichera sur la page.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <label className="block text-sm text-muted mb-1">Question</label>
+                <textarea
+                  required
+                  value={texte}
+                  onChange={(e) => setTexte(e.target.value)}
+                  className="w-full border border-border rounded px-3 py-2 mb-4 min-h-[3rem]"
+                />
+
+                <label className="block text-sm text-muted mb-2">Réponses — coche la ou les bonnes</label>
+                <div className="flex flex-col gap-2 mb-2">
+                  {options.map((o) => (
+                    <div key={o.id} className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={o.is_correct}
+                        onChange={(e) => modifierOption(o.id, { is_correct: e.target.checked })}
+                      />
+                      <input
+                        type="text"
+                        value={o.text}
+                        onChange={(e) => modifierOption(o.id, { text: e.target.value })}
+                        className="flex-1 border border-border rounded px-3 py-1.5 text-sm"
+                      />
+                      <button type="button" onClick={() => retirerOption(o.id)} className="text-xs text-muted">
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={ajouterOption} className="text-sm text-muted mb-4">
+                  + Ajouter une réponse
+                </button>
+
+                <p className="text-xs text-muted mb-1">
+                  L'arbitre pourra cocher autant de cases que de bonnes réponses cochées ci-dessus.
+                </p>
+
+                <label className="block text-sm text-muted mb-1 mt-3">Explication (optionnelle)</label>
+                <textarea
+                  value={explication}
+                  onChange={(e) => setExplication(e.target.value)}
+                  className="w-full border border-border rounded px-3 py-2 mb-2 min-h-[2.5rem]"
+                />
+              </div>
+
+              <div className="p-4 border-t border-border">
+                {erreurForm && (
+                  <p role="alert" className="text-sm text-card-red bg-card-red-bg rounded px-3 py-2 mb-3">
+                    {erreurForm}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  disabled={enregistrement}
+                  className="w-full bg-pitch text-white font-medium rounded py-2 disabled:opacity-60"
+                >
+                  {enregistrement
+                    ? 'Enregistrement…'
+                    : questionEnEditionId
+                      ? 'Enregistrer les modifications'
+                      : 'Enregistrer la question'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       {proposerBanque && (
