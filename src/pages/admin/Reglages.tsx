@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import AppLayout from '../../components/AppLayout';
 import { supabase } from '../../lib/supabaseClient';
+import { extraireErreurFonction } from '../../lib/functionsError';
 
 export default function Reglages() {
   const [loading, setLoading] = useState(true);
@@ -66,7 +67,7 @@ export default function Reglages() {
       const { data, error } = await supabase.functions.invoke('r2-usage-reel');
       if (error || data?.error) {
         setErreurUsage(
-          data?.error ?? "Impossible de récupérer les données réelles de Cloudflare pour l'instant."
+          `Impossible de récupérer les données réelles de Cloudflare : ${await extraireErreurFonction(error, data)}`
         );
       } else {
         setUsageReel(data);
