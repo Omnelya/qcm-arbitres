@@ -44,9 +44,43 @@ function policeQuiTient(texte: string, largeurPo: number, hauteurPo: number) {
   return 12;
 }
 
+// Mise en page d'une question dans la zone (en pouces) : partagée par le PowerPoint et l'aperçu de la page.
+export function miseEnPageQuestion(q: QuestionCorrection, { W, yContenu, bas }: { W: number; yContenu: number; bas: number }) {
+  const dispo = bas - yContenu;
+  const enonce = q.text.replace(/\r\n?/g, '\n').trim();
+  const expl = q.explanation?.replace(/\r\n?/g, '\n').trim() ?? '';
+  // énoncé : plus grande police qui tient dans la moitié de la place, et zone réduite à la hauteur du texte
+  const hMax = Math.min(3.1, dispo * 0.5);
+  // petite zone : si rien ne tient à moitié de la place, on accorde jusqu'à 65 % puis on réduit la police
+  const hLarge = Math.max(hMax, dispo * 0.65);
+  const trouver = (h: number) => [28, 26, 24, 22, 20, 18, 16, 14, 12, 11, 10].find((pt) => hauteurTexte(enonce, W - 0.2, pt) <= h);
+  const police = trouver(hMax) ?? trouver(hLarge) ?? 10;
+  const hEnonce = Math.min(hLarge, hauteurTexte(enonce, W - 0.2, police) + 0.1);
+  const yOpt = yContenu + hEnonce + 0.1;
+  const hExpl = expl ? Math.min(1.45, dispo * 0.25) : 0;
+  const finOpt = bas - (expl ? hExpl + 0.1 : 0);
+  const nbOpt = Math.max(1, q.options.length);
+  const hauteurLigne = Math.min(0.85, (finOpt - yOpt) / nbOpt);
+  // plus grande police pour laquelle chaque réponse tient dans sa ligne
+  const policeOpt =
+    [20, 18, 16, 14, 12, 11, 10].find((pt) =>
+      q.options.every((o) => {
+        const lignes = Math.max(1, Math.ceil((o.text.length * pt * 0.55) / 72 / (W - 0.6)));
+        return (lignes * pt * 1.2) / 72 <= hauteurLigne - 0.15;
+      })
+    ) ?? 10;
+  return { enonce, expl, police, hEnonce, yOpt, hExpl, hauteurLigne, policeOpt };
+}
+
 // fond : image (adresse « data: ») qui remplace l'arrière-plan d'origine.
 // zone : rectangle libre de cet arrière-plan (fractions 0-1, voir zoneLibreFond). Avec une zone, la mise en page
 // est « sobre » (texte foncé, sans bandeau ni voile) et tient dans ce rectangle ; sans zone, un voile garde le texte lisible.
+export interface CouleursTexte {
+  titres: string;
+  enonce: string;
+  reponses: string;
+}
+
 export interface ZoneFond {
   x: number;
   y: number;
@@ -60,7 +94,7 @@ export async function genererPowerPoint(
   nomFichier: string,
   fond?: string,
   zone?: ZoneFond | null,
-  couleurTitres?: string // couleur d'accent (hex sans #) en mode sobre : titres, pastille, filet
+  couleurs?: CouleursTexte // couleurs choisies (hex sans #), appliquées avec une image de fond
 ) {
   const module = await import('pptxgenjs');
   const PptxGenJS = module.default;
@@ -70,7 +104,9 @@ export async function genererPowerPoint(
 
   const sobre = !!(fond && zone);
   const Z = zone ? { x: zone.x * 13.33, y: zone.y * 7.5, w: zone.w * 13.33, h: zone.h * 7.5 } : { x: 0, y: 0, w: 13.33, h: 7.5 };
-  const MARINE = couleurTitres ?? '1B3A6B'; // couleur d'accent en mode sobre
+  const MARINE = couleurs?.titres ?? '1B3A6B'; // couleur d'accent en mode sobre
+  const cEnonce = (sobre && couleurs?.enonce) || TEXTE;
+  const cReponses = (sobre && couleurs?.reponses) || TEXTE;
   const rvb = [0, 2, 4].map((i) => parseInt(MARINE.slice(i, i + 2), 16) / 255);
   const surAccent = 0.299 * rvb[0] + 0.587 * rvb[1] + 0.114 * rvb[2] > 0.6 ? TEXTE : 'FFFFFF'; // texte lisible sur la pastille
   const accent = sobre ? MARINE : VERT;
@@ -125,30 +161,8 @@ export async function genererPowerPoint(
   const W = sobre ? Z.w - 0.3 : 12.3; // largeur du contenu
   const yContenu = sobre ? Z.y + 0.75 : 0.85;
   const bas = sobre ? Z.y + Z.h - 0.1 : 7.2;
-  const dispo = bas - yContenu;
   questions.forEach((q, index) => {
-    const enonce = q.text.replace(/\r\n?/g, '\n').trim();
-    const expl = q.explanation?.replace(/\r\n?/g, '\n').trim() ?? '';
-    // énoncé : plus grande police qui tient dans la moitié de la place, et zone réduite à la hauteur du texte
-    const hMax = Math.min(3.1, dispo * 0.5);
-    // petite zone : si rien ne tient à moitié de la place, on accorde jusqu'à 65 % puis on réduit la police
-    const hLarge = Math.max(hMax, dispo * 0.65);
-    const trouver = (h: number) => [28, 26, 24, 22, 20, 18, 16, 14, 12, 11, 10].find((pt) => hauteurTexte(enonce, W - 0.2, pt) <= h);
-    const police = trouver(hMax) ?? trouver(hLarge) ?? 10;
-    const hEnonce = Math.min(hLarge, hauteurTexte(enonce, W - 0.2, police) + 0.1);
-    const yOpt = yContenu + hEnonce + 0.1;
-    const hExpl = expl ? Math.min(1.45, dispo * 0.25) : 0;
-    const finOpt = bas - (expl ? hExpl + 0.1 : 0);
-    const nbOpt = Math.max(1, q.options.length);
-    const hauteurLigne = Math.min(0.85, (finOpt - yOpt) / nbOpt);
-    // plus grande police pour laquelle chaque réponse tient dans sa ligne
-    const policeOpt =
-      [20, 18, 16, 14, 12, 11, 10].find((pt) =>
-        q.options.every((o) => {
-          const lignes = Math.max(1, Math.ceil((o.text.length * pt * 0.55) / 72 / (W - 0.6)));
-          return (lignes * pt * 1.2) / 72 <= hauteurLigne - 0.15;
-        })
-      ) ?? 10;
+    const { enonce, expl, police, hEnonce, yOpt, hExpl, hauteurLigne, policeOpt } = miseEnPageQuestion(q, { W, yContenu, bas });
     const media = q.type === 'video' ? 'Question vidéo' : q.type === 'image' ? 'Question image' : '';
 
     for (const correction of [false, true]) {
@@ -180,7 +194,7 @@ export async function genererPowerPoint(
           x: 9.3, y: 0, w: 3.6, h: 0.7, fontSize: 16, color: 'CFE3D8', fontFace: 'Calibri', align: 'right', valign: 'middle',
         });
       }
-      s.addText(enonce, { x: X0, y: yContenu, w: W, h: hEnonce, fontSize: police, bold: true, color: TEXTE, fontFace: 'Calibri', valign: 'top' });
+      s.addText(enonce, { x: X0, y: yContenu, w: W, h: hEnonce, fontSize: police, bold: true, color: cEnonce, fontFace: 'Calibri', valign: 'top' });
 
       // mêmes emplacements sur les deux diapositives ; en correction, les mauvaises réponses restent vides
       q.options.forEach((o, i) => {
@@ -192,7 +206,7 @@ export async function genererPowerPoint(
           line: { color: correction ? VERT : sobre ? 'C9D3E3' : 'D5DCD8', width: correction ? 2 : 1 }, rectRadius: 0.08,
         });
         s.addText((correction ? '✓  ' : '') + o.text.trim(), {
-          x: X0 + 0.2, y, w: W - 0.4, h: hauteurLigne - 0.1, fontSize: policeOpt, color: TEXTE, bold: correction, fontFace: 'Calibri', valign: 'middle',
+          x: X0 + 0.2, y, w: W - 0.4, h: hauteurLigne - 0.1, fontSize: policeOpt, color: cReponses, bold: correction, fontFace: 'Calibri', valign: 'middle',
         });
       });
 
@@ -204,10 +218,12 @@ export async function genererPowerPoint(
     }
   });
 
-  // ---- Remerciement (dernière diapositive, « Merci » seul) ----
-  const fin = pptx.addSlide();
-  habiller(fin, VERT, voileVert);
-  fin.addText('Merci', { x: gx, y: sobre ? Z.y + Z.h * 0.35 : 2.9, w: gw, h: 1.6, align: 'center', valign: 'middle', fontSize: sobre ? 60 : 66, bold: true, color: txtTitre, fontFace: 'Calibri' });
+  // ---- Questions ? / Merci (dernière diapositive, « Merci » seul) ----
+  for (const texte of ['Questions ?', 'Merci']) {
+    const f = pptx.addSlide();
+    habiller(f, VERT, voileVert);
+    f.addText(texte, { x: gx, y: sobre ? Z.y + Z.h * 0.35 : 2.9, w: gw, h: 1.6, align: 'center', valign: 'middle', fontSize: sobre ? 60 : 66, bold: true, color: txtTitre, fontFace: 'Calibri' });
+  }
 
   await pptx.writeFile({ fileName: nomFichier });
 }

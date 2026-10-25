@@ -1,111 +1,157 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import { couleursDominantes, type ZoneLibre } from '../lib/zoneLibreFond';
+import { miseEnPageQuestion, type CouleursTexte, type QuestionCorrection } from '../lib/exportPowerPoint';
 
-// Réglage de l'arrière-plan du support : on dessine la zone à remplir et on prélève (pipette) la couleur des titres.
+// Prise de la zone : un côté, un coin, ou tout le cadre (pour le déplacer).
+type Prise = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'deplacer';
+
+const MIN = 0.15; // taille minimale de la zone (fraction de l'image)
+const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
+const po = (n: number) => `${(n * 100) / 13.33}cqw`; // 1 po de diapositive, en fonction de la largeur de l'aperçu
+const pt = (n: number) => po(n / 72);
+
+const POIGNEES: { prise: Prise; style: React.CSSProperties; curseur: string }[] = [
+  { prise: 'n', style: { left: 8, right: 8, top: -7, height: 14 }, curseur: 'ns-resize' },
+  { prise: 's', style: { left: 8, right: 8, bottom: -7, height: 14 }, curseur: 'ns-resize' },
+  { prise: 'w', style: { top: 8, bottom: 8, left: -7, width: 14 }, curseur: 'ew-resize' },
+  { prise: 'e', style: { top: 8, bottom: 8, right: -7, width: 14 }, curseur: 'ew-resize' },
+  { prise: 'nw', style: { top: -7, left: -7, width: 16, height: 16 }, curseur: 'nwse-resize' },
+  { prise: 'se', style: { bottom: -7, right: -7, width: 16, height: 16 }, curseur: 'nwse-resize' },
+  { prise: 'ne', style: { top: -7, right: -7, width: 16, height: 16 }, curseur: 'nesw-resize' },
+  { prise: 'sw', style: { bottom: -7, left: -7, width: 16, height: 16 }, curseur: 'nesw-resize' },
+];
+
+const ROLES: { cle: keyof CouleursTexte; libelle: string }[] = [
+  { cle: 'titres', libelle: 'Titres' },
+  { cle: 'enonce', libelle: 'Énoncé des questions' },
+  { cle: 'reponses', libelle: 'Réponses' },
+];
+
+// Réglage de l'arrière-plan du support : zone à remplir (déformable aux côtés), aperçu de la 1re question, couleurs des polices.
 export default function ReglageFond({
   fond,
   zone,
   onZone,
   zoneAuto,
-  couleur,
-  onCouleur,
+  couleurs,
+  onCouleurs,
+  apercu,
+  total,
 }: {
   fond: string;
   zone: ZoneLibre;
   onZone: (z: ZoneLibre) => void;
   zoneAuto: ZoneLibre | null;
-  couleur: string; // hex sans #
-  onCouleur: (hex: string) => void;
+  couleurs: CouleursTexte;
+  onCouleurs: (c: CouleursTexte) => void;
+  apercu: QuestionCorrection | null; // première question, montrée dans la zone
+  total: number;
 }) {
-  const [mode, setMode] = useState<'zone' | 'pipette'>('zone');
-  const [brouillon, setBrouillon] = useState<ZoneLibre | null>(null);
   const [palette, setPalette] = useState<string[]>([]);
   const cadre = useRef<HTMLDivElement>(null);
-  const img = useRef<HTMLImageElement>(null);
-  const debut = useRef<{ x: number; y: number } | null>(null);
+  const prise = useRef<{ type: Prise; x: number; y: number; z: ZoneLibre } | null>(null);
 
   useEffect(() => {
-    couleursDominantes(fond).then(setPalette);
+    couleursDominantes(fond).then((c) => setPalette([...c, '1E2A24', 'FFFFFF']));
   }, [fond]);
 
-  // position du pointeur en fractions de l'image (0 à 1)
-  const position = (e: PointerEvent) => {
-    const r = cadre.current!.getBoundingClientRect();
-    return { x: Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), y: Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)) };
-  };
-
-  function prelever(p: { x: number; y: number }) {
-    const el = img.current;
-    if (!el || !el.naturalWidth) return;
-    const canvas = document.createElement('canvas');
-    canvas.width = el.naturalWidth;
-    canvas.height = el.naturalHeight;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    ctx.drawImage(el, 0, 0);
-    const [r, g, b] = ctx.getImageData(Math.min(canvas.width - 1, Math.floor(p.x * canvas.width)), Math.min(canvas.height - 1, Math.floor(p.y * canvas.height)), 1, 1).data;
-    onCouleur([r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('').toUpperCase());
-    setMode('zone');
-  }
-
-  const rectangle = (a: { x: number; y: number }, b: { x: number; y: number }): ZoneLibre => ({
-    x: Math.min(a.x, b.x),
-    y: Math.min(a.y, b.y),
-    w: Math.abs(a.x - b.x),
-    h: Math.abs(a.y - b.y),
-  });
-
-  function appuyer(e: PointerEvent) {
-    const p = position(e);
-    if (mode === 'pipette') return prelever(p);
+  function saisir(e: PointerEvent, type: Prise) {
+    e.preventDefault();
+    e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
-    debut.current = p;
-    setBrouillon({ ...p, w: 0, h: 0 });
+    const r = cadre.current!.getBoundingClientRect();
+    prise.current = { type, x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, z: zone };
   }
   function bouger(e: PointerEvent) {
-    if (debut.current) setBrouillon(rectangle(debut.current, position(e)));
-  }
-  function relacher(e: PointerEvent) {
-    if (!debut.current) return;
-    const z = rectangle(debut.current, position(e));
-    debut.current = null;
-    setBrouillon(null);
-    if (z.w >= 0.08 && z.h >= 0.08) onZone(z); // un simple clic ou une zone minuscule ne change rien
+    const p = prise.current;
+    if (!p) return;
+    const r = cadre.current!.getBoundingClientRect();
+    const dx = (e.clientX - r.left) / r.width - p.x;
+    const dy = (e.clientY - r.top) / r.height - p.y;
+    let { x, y, w, h } = p.z;
+    if (p.type === 'deplacer') {
+      x = clamp(x + dx, 0, 1 - w);
+      y = clamp(y + dy, 0, 1 - h);
+    } else {
+      if (p.type.includes('w')) {
+        const nx = clamp(x + dx, 0, x + w - MIN);
+        w = x + w - nx;
+        x = nx;
+      }
+      if (p.type.includes('e')) w = clamp(w + dx, MIN, 1 - x);
+      if (p.type.includes('n')) {
+        const ny = clamp(y + dy, 0, y + h - MIN);
+        h = y + h - ny;
+        y = ny;
+      }
+      if (p.type.includes('s')) h = clamp(h + dy, MIN, 1 - y);
+    }
+    onZone({ x, y, w, h });
   }
 
-  const affichee = brouillon ?? zone;
-  const bouton = (actif: boolean) =>
-    'flex-1 text-sm rounded-xl py-1.5 border ' + (actif ? 'bg-pitch text-white border-pitch' : 'border-border bg-canvas');
+  // Aperçu de la 1re question, avec la même mise en page que le PowerPoint
+  const Zi = { x: zone.x * 13.33, y: zone.y * 7.5, w: zone.w * 13.33, h: zone.h * 7.5 };
+  const X0 = Zi.x + 0.15;
+  const W = Zi.w - 0.3;
+  const L = apercu ? miseEnPageQuestion(apercu, { W, yContenu: Zi.y + 0.75, bas: Zi.y + Zi.h - 0.1 }) : null;
+  const abs = (x: number, y: number, w: number, h: number): React.CSSProperties => ({ position: 'absolute', left: po(x), top: po(y), width: po(w), height: po(h), overflow: 'hidden' });
 
   return (
     <div className="bg-surface rounded-2xl border border-border p-4">
-      <div className="flex gap-2 mb-2">
-        <button type="button" onClick={() => setMode('zone')} className={bouton(mode === 'zone')}>
-          Dessiner la zone
-        </button>
-        <button type="button" onClick={() => setMode('pipette')} className={bouton(mode === 'pipette')}>
-          Pipette (couleur des titres)
-        </button>
-      </div>
       <p className="text-xs text-muted mb-2">
-        {mode === 'zone'
-          ? "Fais glisser sur l'image pour entourer la zone où placer les questions et réponses (le cadre vert)."
-          : "Clique sur l'image, sur la couleur voulue pour les titres."}
+        Le cadre vert est la zone des questions et réponses. Approche la souris d'un côté ou d'un coin pour l'étirer (double flèche), ou glisse à l'intérieur pour le
+        déplacer.
       </p>
 
-      <div
-        ref={cadre}
-        onPointerDown={appuyer}
-        onPointerMove={bouger}
-        onPointerUp={relacher}
-        className={'relative select-none touch-none mx-auto w-full max-w-xl ' + (mode === 'pipette' ? 'cursor-copy' : 'cursor-crosshair')}
-      >
-        <img ref={img} src={fond} alt="Arrière-plan" draggable={false} className="w-full rounded border border-border block" />
+      <div ref={cadre} className="relative select-none touch-none mx-auto w-full max-w-xl" style={{ containerType: 'inline-size' }} onPointerMove={bouger} onPointerUp={() => (prise.current = null)}>
+        <img src={fond} alt="Arrière-plan" draggable={false} className="w-full rounded border border-border block" />
+
+        {apercu && L && (
+          <div aria-hidden="true" className="absolute inset-0 pointer-events-none" style={{ fontFamily: 'Calibri, Carlito, sans-serif', lineHeight: 1.2 }}>
+            <div style={{ ...abs(X0, Zi.y + 0.05, W - 2.6, 0.55), display: 'flex', alignItems: 'center', fontSize: pt(18), fontWeight: 700, color: `#${couleurs.titres}` }}>
+              Question 1 / {total} · Réponses
+            </div>
+            {apercu.moyenne != null && (
+              <div
+                style={{ ...abs(X0 + W - 2.5, Zi.y + 0.1, 2.5, 0.45), display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: po(0.2), background: `#${couleurs.titres}`, color: '#fff', fontSize: pt(16), fontWeight: 700 }}
+              >
+                Moyenne : {apercu.moyenne} %
+              </div>
+            )}
+            <div style={{ ...abs(X0, Zi.y + 0.65, W, 0.02), background: `#${couleurs.titres}` }} />
+            <div style={{ ...abs(X0, Zi.y + 0.75, W, L.hEnonce), fontSize: pt(L.police), fontWeight: 700, color: `#${couleurs.enonce}`, whiteSpace: 'pre-line' }}>{L.enonce}</div>
+            {apercu.options.map((o, i) => (
+              <div
+                key={i}
+                style={{
+                  ...abs(X0, L.yOpt + i * L.hauteurLigne, W, L.hauteurLigne - 0.1),
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: `0 ${po(0.2)}`,
+                  boxSizing: 'border-box',
+                  background: 'rgba(255,255,255,.9)',
+                  border: '1px solid #C9D3E3',
+                  borderRadius: po(0.08),
+                  fontSize: pt(L.policeOpt),
+                  color: `#${couleurs.reponses}`,
+                }}
+              >
+                {o.text}
+              </div>
+            ))}
+          </div>
+        )}
+
         <div
           aria-label="Zone où le texte sera placé"
-          className="absolute border-2 border-dashed border-pitch bg-pitch/15 pointer-events-none"
-          style={{ left: `${affichee.x * 100}%`, top: `${affichee.y * 100}%`, width: `${affichee.w * 100}%`, height: `${affichee.h * 100}%` }}
-        />
+          onPointerDown={(e) => saisir(e, 'deplacer')}
+          className="absolute border-2 border-dashed border-pitch bg-pitch/10"
+          style={{ left: `${zone.x * 100}%`, top: `${zone.y * 100}%`, width: `${zone.w * 100}%`, height: `${zone.h * 100}%`, cursor: 'move' }}
+        >
+          {POIGNEES.map(({ prise: t, style, curseur }) => (
+            <div key={t} data-prise={t} onPointerDown={(e) => saisir(e, t)} className="absolute" style={{ ...style, cursor: curseur, zIndex: 2 }} />
+          ))}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-2 mt-2 mb-4">
@@ -119,28 +165,33 @@ export default function ReglageFond({
         </button>
       </div>
 
-      <p className="text-sm font-semibold mb-1">Couleur des titres</p>
-      <div className="flex flex-wrap items-center gap-2">
-        {palette.map((c) => (
-          <button
-            key={c}
-            type="button"
-            aria-label={`Couleur #${c}`}
-            onClick={() => onCouleur(c)}
-            className={'w-8 h-8 rounded-full border-2 ' + (c === couleur ? 'border-ink' : 'border-border')}
-            style={{ background: `#${c}` }}
-          />
+      <p className="text-sm font-semibold mb-2">Couleurs des polices</p>
+      <div className="flex flex-col gap-3">
+        {ROLES.map(({ cle, libelle }) => (
+          <div key={cle}>
+            <p className="text-xs text-muted mb-1">{libelle}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              {palette.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  aria-label={`${libelle} : #${c}`}
+                  onClick={() => onCouleurs({ ...couleurs, [cle]: c })}
+                  className={'w-7 h-7 rounded-full border-2 ' + (c === couleurs[cle] ? 'border-ink' : 'border-border')}
+                  style={{ background: `#${c}` }}
+                />
+              ))}
+              <input
+                type="color"
+                aria-label={`${libelle} : autre couleur`}
+                value={`#${couleurs[cle]}`}
+                onChange={(e) => onCouleurs({ ...couleurs, [cle]: e.target.value.slice(1).toUpperCase() })}
+                className="w-9 h-7 p-0 border border-border rounded"
+              />
+              <span className="text-xs text-muted">#{couleurs[cle]}</span>
+            </div>
+          </div>
         ))}
-        <input
-          type="color"
-          aria-label="Choisir une autre couleur"
-          value={`#${couleur}`}
-          onChange={(e) => onCouleur(e.target.value.slice(1).toUpperCase())}
-          className="w-10 h-8 p-0 border border-border rounded"
-        />
-        <span className="text-sm font-semibold ml-1" style={{ color: `#${couleur}` }}>
-          Question 1 / 20 · #{couleur}
-        </span>
       </div>
     </div>
   );

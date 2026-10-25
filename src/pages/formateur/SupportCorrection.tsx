@@ -3,6 +3,7 @@ import AppLayout from '../../components/AppLayout';
 import { lireExportCorrection, type ExportLu } from '../../lib/lireExportCorrection';
 import { couleursDominantes, zoneLibreFond, type ZoneLibre } from '../../lib/zoneLibreFond';
 import ReglageFond from '../../components/ReglageFond';
+import type { CouleursTexte } from '../../lib/exportPowerPoint';
 
 // Zone où l'on glisse un fichier (ou que l'on clique pour le choisir).
 function ZoneDepot({
@@ -92,7 +93,7 @@ export default function SupportCorrection() {
   const [fond, setFond] = useState<string | null>(null);
   const [zone, setZone] = useState<ZoneLibre | null>(null); // zone du fond où se place le texte (réglable)
   const [zoneAuto, setZoneAuto] = useState<ZoneLibre | null>(null); // zone libre détectée automatiquement
-  const [couleur, setCouleur] = useState('1B3A6B'); // couleur des titres (hex sans #)
+  const [couleurs, setCouleurs] = useState<CouleursTexte>({ titres: '1B3A6B', enonce: '1E2A24', reponses: '1E2A24' }); // couleurs des polices (hex sans #)
   const [nomFond, setNomFond] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [lecture, setLecture] = useState(false);
@@ -131,7 +132,7 @@ export default function SupportCorrection() {
       const auto = await zoneLibreFond(image);
       setZoneAuto(auto);
       setZone(auto ?? { x: 0.04, y: 0.04, w: 0.92, h: 0.92 });
-      setCouleur((await couleursDominantes(image))[0] ?? '1B3A6B');
+      setCouleurs({ titres: (await couleursDominantes(image))[0] ?? '1B3A6B', enonce: '1E2A24', reponses: '1E2A24' });
       setFond(image);
       setNomFond(f.name);
     } catch {
@@ -146,7 +147,7 @@ export default function SupportCorrection() {
     try {
       const { genererPowerPoint } = await import('../../lib/exportPowerPoint');
       const t = titre.trim() || excel.synthese.titre;
-      await genererPowerPoint({ ...excel.synthese, titre: t }, excel.questions, `${t} - Correction.pptx`, fond ?? undefined, fond ? zone : null, couleur);
+      await genererPowerPoint({ ...excel.synthese, titre: t }, excel.questions, `${t} - Correction.pptx`, fond ?? undefined, fond ? zone : null, couleurs);
     } catch {
       setErreur('La création du PowerPoint a échoué. Réessaie dans un instant.');
     } finally {
@@ -179,7 +180,7 @@ export default function SupportCorrection() {
           nom={nomFond}
           onFichier={choisirFond}
         />
-        {fond && zone && <ReglageFond fond={fond} zone={zone} onZone={setZone} zoneAuto={zoneAuto} couleur={couleur} onCouleur={setCouleur} />}
+        {fond && zone && <ReglageFond fond={fond} zone={zone} onZone={setZone} zoneAuto={zoneAuto} couleurs={couleurs} onCouleurs={setCouleurs} apercu={excel?.questions[0] ?? null} total={excel?.questions.length ?? 0} />}
         {fond && (
           <button
             type="button"
@@ -215,7 +216,7 @@ export default function SupportCorrection() {
           />
           <ul className="text-sm flex flex-col gap-1 mb-3">
             <li>
-              {excel.questions.length} question(s) → {excel.questions.length * 2 + 2} diapositives
+              {excel.questions.length} question(s) → {excel.questions.length * 2 + 3} diapositives
             </li>
             <li>
               Participation : {s.nbRepondus} / {s.nbArbitres} ({taux} %)
