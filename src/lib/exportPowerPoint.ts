@@ -1,5 +1,5 @@
 // Génère le PowerPoint de correction d'un QCM : page de garde, deux diapositives par question
-// (énoncé + réponses, puis énoncé + bonnes réponses + explication), « Questions ? » et remerciements.
+// (énoncé + réponses, puis énoncé + bonnes réponses + explication), « Merci ».
 export interface QuestionCorrection {
   type: 'video' | 'image' | 'text';
   text: string;
@@ -59,7 +59,8 @@ export async function genererPowerPoint(
   questions: QuestionCorrection[],
   nomFichier: string,
   fond?: string,
-  zone?: ZoneFond | null
+  zone?: ZoneFond | null,
+  couleurTitres?: string // couleur d'accent (hex sans #) en mode sobre : titres, pastille, filet
 ) {
   const module = await import('pptxgenjs');
   const PptxGenJS = module.default;
@@ -69,7 +70,9 @@ export async function genererPowerPoint(
 
   const sobre = !!(fond && zone);
   const Z = zone ? { x: zone.x * 13.33, y: zone.y * 7.5, w: zone.w * 13.33, h: zone.h * 7.5 } : { x: 0, y: 0, w: 13.33, h: 7.5 };
-  const MARINE = '1B3A6B'; // couleur d'accent en mode sobre
+  const MARINE = couleurTitres ?? '1B3A6B'; // couleur d'accent en mode sobre
+  const rvb = [0, 2, 4].map((i) => parseInt(MARINE.slice(i, i + 2), 16) / 255);
+  const surAccent = 0.299 * rvb[0] + 0.587 * rvb[1] + 0.114 * rvb[2] > 0.6 ? TEXTE : 'FFFFFF'; // texte lisible sur la pastille
   const accent = sobre ? MARINE : VERT;
   const txtClair = sobre ? GRIS : 'CFE3D8';
   const txtTitre = sobre ? MARINE : 'FFFFFF';
@@ -128,8 +131,11 @@ export async function genererPowerPoint(
     const expl = q.explanation?.replace(/\r\n?/g, '\n').trim() ?? '';
     // énoncé : plus grande police qui tient dans la moitié de la place, et zone réduite à la hauteur du texte
     const hMax = Math.min(3.1, dispo * 0.5);
-    const police = [28, 26, 24, 22, 20, 18, 16, 14, 12].find((pt) => hauteurTexte(enonce, W - 0.2, pt) <= hMax) ?? 12;
-    const hEnonce = Math.min(hMax, hauteurTexte(enonce, W - 0.2, police) + 0.1);
+    // petite zone : si rien ne tient à moitié de la place, on accorde jusqu'à 65 % puis on réduit la police
+    const hLarge = Math.max(hMax, dispo * 0.65);
+    const trouver = (h: number) => [28, 26, 24, 22, 20, 18, 16, 14, 12, 11, 10].find((pt) => hauteurTexte(enonce, W - 0.2, pt) <= h);
+    const police = trouver(hMax) ?? trouver(hLarge) ?? 10;
+    const hEnonce = Math.min(hLarge, hauteurTexte(enonce, W - 0.2, police) + 0.1);
     const yOpt = yContenu + hEnonce + 0.1;
     const hExpl = expl ? Math.min(1.45, dispo * 0.25) : 0;
     const finOpt = bas - (expl ? hExpl + 0.1 : 0);
@@ -137,12 +143,12 @@ export async function genererPowerPoint(
     const hauteurLigne = Math.min(0.85, (finOpt - yOpt) / nbOpt);
     // plus grande police pour laquelle chaque réponse tient dans sa ligne
     const policeOpt =
-      [20, 18, 16, 14, 12].find((pt) =>
+      [20, 18, 16, 14, 12, 11, 10].find((pt) =>
         q.options.every((o) => {
           const lignes = Math.max(1, Math.ceil((o.text.length * pt * 0.55) / 72 / (W - 0.6)));
           return (lignes * pt * 1.2) / 72 <= hauteurLigne - 0.15;
         })
-      ) ?? 12;
+      ) ?? 10;
     const media = q.type === 'video' ? 'Question vidéo' : q.type === 'image' ? 'Question image' : '';
 
     for (const correction of [false, true]) {
@@ -158,7 +164,7 @@ export async function genererPowerPoint(
         if (q.moyenne != null) {
           s.addShape(pptx.ShapeType.roundRect, { x: X0 + W - largeurPastille, y: Z.y + 0.1, w: largeurPastille, h: 0.45, fill: { color: MARINE }, line: { color: MARINE }, rectRadius: 0.2 });
           s.addText(`Moyenne : ${pct(q.moyenne)}`, {
-            x: X0 + W - largeurPastille, y: Z.y + 0.1, w: largeurPastille, h: 0.45, fontSize: 16, bold: true, color: 'FFFFFF', fontFace: 'Calibri', align: 'center', valign: 'middle',
+            x: X0 + W - largeurPastille, y: Z.y + 0.1, w: largeurPastille, h: 0.45, fontSize: 16, bold: true, color: surAccent, fontFace: 'Calibri', align: 'center', valign: 'middle',
           });
         }
         s.addShape(pptx.ShapeType.line, { x: X0, y: Z.y + 0.65, w: W, h: 0, line: { color: MARINE, width: 1.5 } });
@@ -198,14 +204,10 @@ export async function genererPowerPoint(
     }
   });
 
-  // ---- Questions ? / Remerciements ----
-  for (const texte of ['Questions ?', 'Merci de votre attention']) {
-    const s = pptx.addSlide();
-    habiller(s, VERT, voileVert);
-    const my = sobre ? Z.y + Z.h * 0.3 : 2.6;
-    s.addText(texte, { x: gx, y: my, w: gw, h: 1.6, align: 'center', valign: 'middle', fontSize: sobre ? 48 : 54, bold: true, color: txtTitre, fontFace: 'Calibri' });
-    s.addText(synthese.titre, { x: gx, y: my + 1.8, w: gw, h: 0.8, align: 'center', fontSize: 20, color: txtClair, fontFace: 'Calibri' });
-  }
+  // ---- Remerciement (dernière diapositive, « Merci » seul) ----
+  const fin = pptx.addSlide();
+  habiller(fin, VERT, voileVert);
+  fin.addText('Merci', { x: gx, y: sobre ? Z.y + Z.h * 0.35 : 2.9, w: gw, h: 1.6, align: 'center', valign: 'middle', fontSize: sobre ? 60 : 66, bold: true, color: txtTitre, fontFace: 'Calibri' });
 
   await pptx.writeFile({ fileName: nomFichier });
 }

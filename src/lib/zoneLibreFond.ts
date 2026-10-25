@@ -63,3 +63,40 @@ export function zoneLibreFond(dataUrl: string): Promise<ZoneLibre | null> {
     img.src = dataUrl;
   });
 }
+
+// Couleurs franches les plus présentes dans l'image (hors blanc et gris), pour proposer une couleur de titre.
+export function couleursDominantes(dataUrl: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onerror = () => resolve([]);
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 96;
+      canvas.height = 54;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve([]);
+      ctx.drawImage(img, 0, 0, 96, 54);
+      const px = ctx.getImageData(0, 0, 96, 54).data;
+      const seaux = new Map<number, { n: number; r: number; g: number; b: number }>();
+      for (let i = 0; i < px.length; i += 4) {
+        const [r, g, b] = [px[i], px[i + 1], px[i + 2]];
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        if (lum > 0.8 || Math.max(r, g, b) - Math.min(r, g, b) < 40) continue;
+        const cle = (r >> 5) * 64 + (g >> 5) * 8 + (b >> 5);
+        const s = seaux.get(cle) ?? { n: 0, r: 0, g: 0, b: 0 };
+        seaux.set(cle, { n: s.n + 1, r: s.r + r, g: s.g + g, b: s.b + b });
+      }
+      const hex = (v: number) => Math.round(v).toString(16).padStart(2, '0');
+      const choisies: { r: number; g: number; b: number }[] = [];
+      for (const s of [...seaux.values()].sort((a, b) => b.n - a.n)) {
+        const c = { r: s.r / s.n, g: s.g / s.n, b: s.b / s.n };
+        // on saute les teintes trop proches d'une déjà proposée
+        if (choisies.some((d) => Math.abs(d.r - c.r) + Math.abs(d.g - c.g) + Math.abs(d.b - c.b) < 90)) continue;
+        choisies.push(c);
+        if (choisies.length === 5) break;
+      }
+      resolve(choisies.map((c) => `${hex(c.r)}${hex(c.g)}${hex(c.b)}`.toUpperCase()));
+    };
+    img.src = dataUrl;
+  });
+}
