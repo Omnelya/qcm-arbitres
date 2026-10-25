@@ -67,6 +67,22 @@ const lireImage = (f: File) =>
     r.readAsDataURL(f);
   });
 
+// PDF : seule la première page sert de fond, convertie en image (bibliothèque chargée à la demande).
+async function pdfEnImage(f: File): Promise<string> {
+  const pdfjs = await import('pdfjs-dist');
+  const worker = (await import('pdfjs-dist/build/pdf.worker.min.mjs?url')).default;
+  pdfjs.GlobalWorkerOptions.workerSrc = worker;
+  const pdf = await pdfjs.getDocument({ data: new Uint8Array(await f.arrayBuffer()) }).promise;
+  const page = await pdf.getPage(1);
+  const base = page.getViewport({ scale: 1 });
+  const vue = page.getViewport({ scale: 1920 / base.width }); // largeur 1920 px : net en plein écran
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(vue.width);
+  canvas.height = Math.round(vue.height);
+  await page.render({ canvasContext: canvas.getContext('2d')!, viewport: vue }).promise;
+  return canvas.toDataURL('image/jpeg', 0.9);
+}
+
 export default function SupportCorrection() {
   const [excel, setExcel] = useState<ExportLu | null>(null);
   const [nomExcel, setNomExcel] = useState<string | null>(null);
@@ -100,12 +116,13 @@ export default function SupportCorrection() {
 
   async function choisirFond(f: File) {
     setErreur(null);
-    if (!f.type.startsWith('image/')) {
-      setErreur('Dépose une image (JPG ou PNG).');
+    const estPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
+    if (!estPdf && !f.type.startsWith('image/')) {
+      setErreur('Dépose une image (JPG, PNG) ou un PDF.');
       return;
     }
     try {
-      setFond(await lireImage(f));
+      setFond(estPdf ? await pdfEnImage(f) : await lireImage(f));
       setNomFond(f.name);
     } catch {
       setErreur("Cette image n'a pas pu être lue.");
@@ -147,8 +164,8 @@ export default function SupportCorrection() {
         />
         <ZoneDepot
           titre="2. Image d'arrière-plan (facultatif)"
-          aide="Remplace l'arrière-plan d'origine sur toutes les diapositives. Format 16:9 conseillé."
-          accept="image/*"
+          aide="Image ou PDF (1re page) qui remplace l'arrière-plan d'origine sur toutes les diapositives. Format 16:9 conseillé."
+          accept="image/*,.pdf,application/pdf"
           nom={nomFond}
           onFichier={choisirFond}
           enfant={fond ? <img src={fond} alt="Aperçu de l'arrière-plan" className="mx-auto mb-2 max-h-28 rounded" /> : undefined}
