@@ -23,6 +23,14 @@ export default function Reglages() {
     classB: number;
     objectCount: number | null;
     payloadSizeOctets: number | null;
+    diagnostic?: {
+      comptesRenvoyes: number;
+      lignesOperations: number;
+      lignesStockage: number;
+      bucketConfigure: string | null;
+      bucketsVus: string[];
+      bucketNonTrouve: boolean;
+    };
   } | null>(null);
   const [erreurUsage, setErreurUsage] = useState<string | null>(null);
   const [chargementUsage, setChargementUsage] = useState(true);
@@ -171,6 +179,15 @@ export default function Reglages() {
                 </div>
                 {barre(usageReel.payloadSizeOctets / 1_000_000_000, quotaGo)}
               </div>
+            )}
+            {usageReel.diagnostic && (usageReel.diagnostic.comptesRenvoyes === 0 || usageReel.diagnostic.bucketNonTrouve || usageReel.diagnostic.lignesOperations + usageReel.diagnostic.lignesStockage === 0) && (
+              <p className="text-xs text-card-yellow mt-3">
+                {usageReel.diagnostic.comptesRenvoyes === 0
+                  ? "Cloudflare n'a renvoyé aucun compte : le jeton CF_API_TOKEN n'a sans doute pas la permission « Account Analytics : Read » sur ce compte, ou R2_ACCOUNT_ID est incorrect."
+                  : usageReel.diagnostic.bucketNonTrouve
+                    ? `Le bucket configuré « ${usageReel.diagnostic.bucketConfigure} » est introuvable côté Cloudflare (buckets vus : ${usageReel.diagnostic.bucketsVus.join(', ') || 'aucun'}). Vérifie le secret R2_BUCKET_NAME.`
+                    : "Cloudflare n'a renvoyé aucune donnée pour ce mois-ci (compte et bucket reconnus, mais aucune activité enregistrée)."}
+              </p>
             )}
             <p className="text-xs text-muted mt-3">
               Données réelles, directement depuis l'API Cloudflare (pas une estimation). Les requêtes

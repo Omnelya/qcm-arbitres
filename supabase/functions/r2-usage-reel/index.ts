@@ -29,15 +29,15 @@ function json(body: unknown, status: number) {
 }
 
 const REQUETE_OPERATIONS = `
-  query Operations($accountTag: string!, $start: Time, $end: Time, $bucketName: string) {
+  query Operations($accountTag: string!, $start: Time, $end: Time) {
     viewer {
       accounts(filter: { accountTag: $accountTag }) {
         r2OperationsAdaptiveGroups(
           limit: 10000
-          filter: { datetime_geq: $start, datetime_leq: $end, bucketName: $bucketName }
+          filter: { datetime_geq: $start, datetime_leq: $end }
         ) {
           sum { requests }
-          dimensions { actionType }
+          dimensions { actionType bucketName }
         }
       }
     }
@@ -45,16 +45,16 @@ const REQUETE_OPERATIONS = `
 `;
 
 const REQUETE_STOCKAGE = `
-  query Storage($accountTag: string!, $start: Time, $end: Time, $bucketName: string) {
+  query Storage($accountTag: string!, $start: Time, $end: Time) {
     viewer {
       accounts(filter: { accountTag: $accountTag }) {
         r2StorageAdaptiveGroups(
-          limit: 1
-          filter: { datetime_geq: $start, datetime_leq: $end, bucketName: $bucketName }
+          limit: 1000
+          filter: { datetime_geq: $start, datetime_leq: $end }
           orderBy: [datetime_DESC]
         ) {
           max { objectCount payloadSize metadataSize }
-          dimensions { datetime }
+          dimensions { datetime bucketName }
         }
       }
     }
@@ -116,7 +116,6 @@ Deno.serve(async (req: Request) => {
           query,
           variables: {
             accountTag,
-            bucketName,
             start: debutMois.toISOString(),
             end: maintenant.toISOString(),
           },
@@ -134,8 +133,18 @@ Deno.serve(async (req: Request) => {
       appelGraphQL(REQUETE_STOCKAGE),
     ]);
 
-    const lignesOperations =
-      operationsData?.data?.viewer?.accounts?.[0]?.r2OperationsAdaptiveGroups ?? [];
+    const comptes = operationsData?.data?.viewer?.accounts ?? [];
+    const toutesOperations: any[] = comptes[0]?.r2OperationsAdaptiveGroups ?? [];
+    const toutStockage: any[] = storageData?.data?.viewer?.accounts?.[0]?.r2StorageAdaptiveGroups ?? [];
+
+    // On retient les lignes du bucket configuré (nom comparé sans tenir compte des majuscules) ;
+    // si aucune ne correspond alors que Cloudflare en renvoie, on prend tout le compte et on le signale.
+    const memeBucket = (l: any) => String(l?.dimensions?.bucketName ?? '').toLowerCase() === String(bucketName ?? '').toLowerCase();
+    const opsDuBucket = toutesOperations.filter(memeBucket);
+    const stockDuBucket = toutStockage.filter(memeBucket);
+    const bucketNonTrouve = (toutesOperations.length > 0 && opsDuBucket.length === 0) || (toutStockage.length > 0 && stockDuBucket.length === 0);
+    const lignesOperations = opsDuBucket.length > 0 || toutesOperations.length === 0 ? opsDuBucket : toutesOperations;
+    const lignesStockage = stockDuBucket.length > 0 || toutStockage.length === 0 ? stockDuBucket : toutStockage;
 
     const CLASSE_A = new Set([
       'ListBuckets', 'PutBucket', 'ListObjects', 'PutObject', 'CopyObject',
@@ -158,8 +167,20 @@ Deno.serve(async (req: Request) => {
       // DeleteObject et les autres opérations gratuites sont ignorées ici.
     }
 
-    const ligneStockage =
-      storageData?.data?.viewer?.accounts?.[0]?.r2StorageAdaptiveGroups?.[0]?.max ?? null;
+    const ligneStockage = lignesStockage[0]?.max ?? null;
+
+    // Aide au dépannage affichée dans Réglages quand les valeurs sont à 0
+    const bucketsVus = [
+      ...new Set([...toutesOperations, ...toutStockage].map((l: any) => l?.dimensions?.bucketName).filter(Boolean)),
+    ];
+    const diagnostic = {
+      comptesRenvoyes: comptes.length,
+      lignesOperations: toutesOperations.length,
+      lignesStockage: toutStockage.length,
+      bucketConfigure: bucketName ?? null,
+      bucketsVus,
+      bucketNonTrouve,
+    };
 
     return json(
       {
@@ -168,6 +189,7 @@ Deno.serve(async (req: Request) => {
         classB,
         objectCount: ligneStockage?.objectCount ?? null,
         payloadSizeOctets: ligneStockage?.payloadSize ?? null,
+        diagnostic,
       },
       200
     );
