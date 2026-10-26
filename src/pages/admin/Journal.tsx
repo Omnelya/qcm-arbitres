@@ -41,7 +41,7 @@ export default function Journal() {
       const { data: entrees, error: err1 } = await requete;
 
       if (err1) {
-        setErreur('Impossible de charger le journal. Réessaie dans un instant.');
+        setErreur('Impossible de charger le journal. Réessayez dans un instant.');
         setLoading(false);
         return;
       }

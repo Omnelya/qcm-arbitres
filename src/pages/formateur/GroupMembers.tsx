@@ -113,7 +113,7 @@ export default function GroupMembers() {
       supabase.from('group_members').delete().eq('group_id', groupId),
     );
     if (errDelete) {
-      setErreur("L'enregistrement a échoué. Réessaie dans un instant.");
+      setErreur("L'enregistrement a échoué. Réessayez dans un instant.");
       setEnregistrement(false);
       return;
     }
@@ -125,7 +125,7 @@ export default function GroupMembers() {
         })),
       );
       if (error) {
-        setErreur("L'enregistrement a échoué. Réessaie dans un instant.");
+        setErreur("L'enregistrement a échoué. Réessayez dans un instant.");
         setEnregistrement(false);
         return;
       }
@@ -153,13 +153,13 @@ export default function GroupMembers() {
       {structureGroupe && <BadgeStructure structure={structureGroupe} className="mb-2" />}
       {aRattacher ? (
         <p className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2">
-          Ce groupe n'est rattaché à aucune structure. Retourne dans « Mes groupes » et rattache-le à une
+          Ce groupe n'est rattaché à aucune structure. Retournez dans « Mes groupes » et rattachez-le à une
           structure pour pouvoir modifier ses membres.
         </p>
       ) : (
         <>
           <p className="text-sm text-muted mb-4">
-            Coche les arbitres à inclure (
+            Cochez les arbitres à inclure (
             {selection.size} sélectionné(s))
           </p>
 

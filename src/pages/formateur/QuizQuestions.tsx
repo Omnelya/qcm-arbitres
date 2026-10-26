@@ -161,7 +161,7 @@ export default function QuizQuestions() {
     const { error } = await supabase.rpc('banque_mettre_a_jour', { p_question: proposerBanque });
     setMajBanqueEnCours(false);
     if (error) {
-      setErreurBanque('La mise à jour de la banque a échoué. Réessaie dans un instant.');
+      setErreurBanque('La mise à jour de la banque a échoué. Réessayez dans un instant.');
       return;
     }
     setProposerBanque(null);
@@ -202,7 +202,7 @@ export default function QuizQuestions() {
     setStatutQcm(quiz?.status ?? null);
 
     if (error) {
-      setErreurListe('Impossible de charger les questions. Réessaie dans un instant.');
+      setErreurListe('Impossible de charger les questions. Réessayez dans un instant.');
     } else {
       setQuestions((data ?? []) as unknown as QuestionRow[]);
     }
@@ -353,7 +353,7 @@ export default function QuizQuestions() {
 
     if (q.media_url === '__deleted__') {
       setErreurForm(
-        'La vidéo/image originale a été supprimée automatiquement (durée de conservation dépassée). Choisis-en une nouvelle pour la remplacer.'
+        'La vidéo/image originale a été supprimée automatiquement (durée de conservation dépassée). Choisissez-en une nouvelle pour la remplacer.'
       );
     } else if (q.media_url) {
       setChargementApercu(true);
@@ -426,7 +426,7 @@ export default function QuizQuestions() {
     );
     if (error) {
       throw new Error(
-        idExistant ? 'La modification de la question a échoué. Réessaie dans un instant.' : "L'enregistrement de la question a échoué. Réessaie dans un instant."
+        idExistant ? 'La modification de la question a échoué. Réessayez dans un instant.' : "L'enregistrement de la question a échoué. Réessayez dans un instant."
       );
     }
   }
@@ -476,16 +476,16 @@ export default function QuizQuestions() {
 
     if (!quizId) return;
     if (type !== 'text' && !fichier && !mediaKeyExistant) {
-      setErreurForm('Ajoute un fichier avant d’enregistrer.');
+      setErreurForm('Ajoutez un fichier avant d’enregistrer.');
       return;
     }
     const optionsRemplies = options.filter((o) => o.text.trim() !== '');
     if (optionsRemplies.length < 2) {
-      setErreurForm('Ajoute au moins deux propositions de réponse.');
+      setErreurForm('Ajoutez au moins deux propositions de réponse.');
       return;
     }
     if (!optionsRemplies.some((o) => o.is_correct)) {
-      setErreurForm('Coche au moins une bonne réponse.');
+      setErreurForm('Cochez au moins une bonne réponse.');
       return;
     }
 
@@ -576,7 +576,7 @@ export default function QuizQuestions() {
     setQuestions(suite);
     const { error } = await supabase.rpc('reordonner_questions', { p_quiz: quizId, p_ordre: suite.map((q) => q.id) });
     if (error) {
-      setErreurListe('Le nouvel ordre n’a pas pu être enregistré. Réessaie dans un instant.');
+      setErreurListe('Le nouvel ordre n’a pas pu être enregistré. Réessayez dans un instant.');
       await charger();
     }
   }
@@ -635,7 +635,7 @@ export default function QuizQuestions() {
       )}
 
       {!loading && questions.length === 0 && brouillonOuvert && (
-        <p className="text-sm text-muted mb-6">Aucune question pour le moment. Utilise « Ajouter une question » en haut à droite.</p>
+        <p className="text-sm text-muted mb-6">Aucune question pour le moment. Utilisez « Ajouter une question » en haut à droite.</p>
       )}
 
       {!loading && questions.length > 0 && (
@@ -852,8 +852,8 @@ export default function QuizQuestions() {
                 {brouillonRestaure && (
                   <p className="text-xs text-muted bg-canvas rounded-lg px-3 py-2 mb-3">
                     {questionEnEditionId
-                      ? 'Modifications retrouvées : tu reprends là où tu t’étais arrêté. Si tu avais choisi une nouvelle vidéo ou image, choisis-la de nouveau.'
-                      : 'Brouillon retrouvé : ta question en cours a été restaurée. Si elle contenait une vidéo ou une image, choisis-la de nouveau.'}
+                      ? 'Modifications retrouvées : vous reprenez là où vous vous étiez arrêté. Si vous aviez choisi une nouvelle vidéo ou image, choisissez-la de nouveau.'
+                      : 'Brouillon retrouvé : votre question en cours a été restaurée. Si elle contenait une vidéo ou une image, choisissez-la de nouveau.'}
                   </p>
                 )}
 
@@ -881,7 +881,7 @@ export default function QuizQuestions() {
                   <div className="mb-4">
                     <label className="block text-sm text-muted mb-1">
                       {type === 'video' ? 'Vidéo' : 'Image'}
-                      {mediaKeyExistant && !fichier && ' (fichier actuel conservé si tu n’en choisis pas un nouveau)'}
+                      {mediaKeyExistant && !fichier && ' (fichier actuel conservé si vous n’en choisissez pas un nouveau)'}
                     </label>
                     <input
                       type="file"
@@ -908,7 +908,7 @@ export default function QuizQuestions() {
                   className="w-full border border-border rounded px-3 py-2 mb-4 min-h-[3rem]"
                 />
 
-                <label className="block text-sm text-muted mb-2">Réponses — coche la ou les bonnes</label>
+                <label className="block text-sm text-muted mb-2">Réponses — cochez la ou les bonnes</label>
                 <div className="flex flex-col gap-2 mb-2">
                   {options.map((o) => (
                     <div key={o.id} className="flex items-center gap-2">
@@ -981,7 +981,7 @@ export default function QuizQuestions() {
               Mettre à jour la banque ?
             </p>
             <p className="text-sm text-muted mb-4">
-              Cette question vient de la banque de questions et tu l’as modifiée. Veux-tu appliquer ces modifications
+              Cette question vient de la banque de questions et vous l’avez modifiée. Voulez-vous appliquer ces modifications
               (énoncé, réponses, explication) à la banque ? Les autres QCM déjà créés ne changent pas.
             </p>
             {erreurBanque && <p className="text-sm text-card-red mb-3">{erreurBanque}</p>}
@@ -992,7 +992,7 @@ export default function QuizQuestions() {
                 disabled={majBanqueEnCours}
                 className="bg-pitch text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
               >
-                {majBanqueEnCours ? 'Patiente…' : 'Oui, mettre à jour la banque'}
+                {majBanqueEnCours ? 'Patientez…' : 'Oui, mettre à jour la banque'}
               </button>
               <button
                 type="button"

@@ -102,7 +102,7 @@ export default function SupportCorrection() {
   async function choisirExcel(f: File) {
     setErreur(null);
     if (!/\.xlsx?$/i.test(f.name)) {
-      setErreur('Dépose un fichier Excel (.xlsx).');
+      setErreur('Déposez un fichier Excel (.xlsx).');
       return;
     }
     setLecture(true);
@@ -124,7 +124,7 @@ export default function SupportCorrection() {
     setErreur(null);
     const estPdf = f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
     if (!estPdf && !f.type.startsWith('image/')) {
-      setErreur('Dépose une image (JPG, PNG) ou un PDF.');
+      setErreur('Déposez une image (JPG, PNG) ou un PDF.');
       return;
     }
     try {
@@ -149,7 +149,7 @@ export default function SupportCorrection() {
       const t = titre.trim() || excel.synthese.titre;
       await genererPowerPoint({ ...excel.synthese, titre: t }, excel.questions, `${t} - Correction.pptx`, fond ?? undefined, fond ? zone : null, couleurs);
     } catch {
-      setErreur('La création du PowerPoint a échoué. Réessaie dans un instant.');
+      setErreur('La création du PowerPoint a échoué. Réessayez dans un instant.');
     } finally {
       setGeneration(false);
     }
@@ -162,13 +162,13 @@ export default function SupportCorrection() {
     <AppLayout>
       <h1 className="text-lg font-semibold mb-1">Support de correction</h1>
       <p className="text-sm text-muted mb-4">
-        Transforme un export Excel de résultats en PowerPoint pour animer une correction en visio.
+        Transformez un export Excel de résultats en PowerPoint pour animer une correction en visio.
       </p>
 
       <div className="flex flex-col gap-3 mb-4">
         <ZoneDepot
           titre="1. Fichier Excel des résultats"
-          aide="Glisse ici l'export (feuilles « Synthese », « Sans réponse » et une feuille par question)."
+          aide="Glissez ici l'export (feuilles « Synthese », « Sans réponse » et une feuille par question)."
           accept=".xlsx,.xls"
           nom={lecture ? 'Lecture du fichier…' : nomExcel}
           onFichier={choisirExcel}

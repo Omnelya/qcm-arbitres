@@ -51,7 +51,7 @@ export default function ArbitreAccueil() {
     const { data: quizzesData, error: err1 } = await supabase.rpc('get_arbitre_quizzes');
 
     if (err1) {
-      setErreur('Impossible de charger tes QCM. Réessaie dans un instant.');
+      setErreur('Impossible de charger vos QCM. Réessayez dans un instant.');
       setLoading(false);
       return;
     }
@@ -102,7 +102,7 @@ export default function ArbitreAccueil() {
     setDemarrage(null);
     if (error) {
       setQuizPourInstructions(null);
-      setErreur('Le démarrage du QCM a échoué. Réessaie dans un instant.');
+      setErreur('Le démarrage du QCM a échoué. Réessayez dans un instant.');
       return;
     }
     navigate(`/arbitre/qcm/${quizId}`);
@@ -122,7 +122,7 @@ export default function ArbitreAccueil() {
       <p className="text-sm text-muted mt-1 mb-4">
         {quizzes.length === 0
           ? 'Aucun QCM ne t\'attend pour le moment.'
-          : `${quizzes.length} QCM ${quizzes.length > 1 ? "t'attendent" : "t'attend"}.`}
+          : `${quizzes.length} QCM ${quizzes.length > 1 ? "vous attendent" : "vous attend"}.`}
       </p>
       {erreur && <p className="text-sm text-card-red mb-4">{erreur}</p>}
 

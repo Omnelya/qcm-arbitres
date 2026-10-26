@@ -65,8 +65,8 @@ function construireEmailHtml(
 ): string {
   const titre = relance ? 'Rappel : un QCM t\'attend' : 'Un nouveau QCM t\'attend';
   const texte = relance
-    ? `Bonjour ${prenom},<br/><br/>Tu n'as pas encore répondu au QCM « <strong>${titreQuiz}</strong> ». Il reste accessible jusqu'au <strong>${formaterDateHeure(periodEnd)}</strong> : pense à le faire avant cette date.`
-    : `Bonjour ${prenom},<br/><br/>Le QCM « <strong>${titreQuiz}</strong> » vient d'être mis à ta disposition sur QCM Arbitres. Il sera accessible du <strong>${formaterDateHeure(periodStart)}</strong> au <strong>${formaterDateHeure(periodEnd)}</strong>.`;
+    ? `Bonjour ${prenom},<br/><br/>Vous n'avez pas encore répondu au QCM « <strong>${titreQuiz}</strong> ». Il reste accessible jusqu'au <strong>${formaterDateHeure(periodEnd)}</strong> : pensez à le faire avant cette date.`
+    : `Bonjour ${prenom},<br/><br/>Le QCM « <strong>${titreQuiz}</strong> » vient d'être mis à votre disposition sur QCM Arbitres. Il sera accessible du <strong>${formaterDateHeure(periodStart)}</strong> au <strong>${formaterDateHeure(periodEnd)}</strong>.`;
   return `<!doctype html>
 <html lang="fr">
 <head>
@@ -103,7 +103,7 @@ function construireEmailHtml(
         </td></tr>
 
         <tr><td style="padding:18px 40px;border-top:1px solid #E3E1DB;text-align:center;">
-          <p style="margin:0;font-size:12px;line-height:1.6;color:#6B6B64;font-family:Inter,Arial,sans-serif;">Tu reçois ce mail car ton compte QCM Arbitres est rattaché à un groupe concerné par ce QCM.</p>
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#6B6B64;font-family:Inter,Arial,sans-serif;">Vous recevez ce mail car votre compte QCM Arbitres est rattaché à un groupe concerné par ce QCM.</p>
         </td></tr>
 
       </table>
@@ -216,7 +216,7 @@ Deno.serve(async (req: Request) => {
         .limit(1)
         .maybeSingle();
       if (derniere && maintenant - new Date(derniere.sent_at).getTime() < 10 * 60_000) {
-        return json({ error: 'Une relance vient déjà d\'être envoyée. Attends 10 minutes avant la suivante.' }, 429);
+        return json({ error: 'Une relance vient déjà d\'être envoyée. Attendez 10 minutes avant la suivante.' }, 429);
       }
     }
 

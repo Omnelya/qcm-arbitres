@@ -97,7 +97,7 @@ export default function FormateurDashboard() {
     const { error: err } = await supabase.from('quizzes').delete().eq('id', q.id);
     setSuppression(false);
     if (err) {
-      setErreurSuppression('La suppression a échoué. Réessaie dans un instant.');
+      setErreurSuppression('La suppression a échoué. Réessayez dans un instant.');
       return;
     }
     setASupprimer(null);
@@ -117,7 +117,7 @@ export default function FormateurDashboard() {
         .eq('formateur_id', session.user.id);
 
       if (error) {
-        setError('Impossible de charger tes QCM. Réessaie dans un instant.');
+        setError('Impossible de charger vos QCM. Réessayez dans un instant.');
         setLoading(false);
         return;
       }
@@ -204,7 +204,7 @@ export default function FormateurDashboard() {
 
     setCreation(false);
     if (error || !data) {
-      setError('La création du QCM a échoué. Réessaie dans un instant.');
+      setError('La création du QCM a échoué. Réessayez dans un instant.');
       return;
     }
     navigate(`/formateur/qcm/${data.id}`);

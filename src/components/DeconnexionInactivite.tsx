@@ -76,7 +76,7 @@ export default function DeconnexionInactivite({ onDeconnexion }: { onDeconnexion
       <div role="alertdialog" aria-modal="true" aria-label="Déconnexion pour inactivité" className="bg-surface rounded-[14px] w-full max-w-sm p-5 text-center">
         <p className="text-sm font-medium mb-1">Toujours là ?</p>
         <p className="text-sm text-muted mb-4">
-          Par sécurité, tu seras déconnecté dans {secondesRestantes} seconde{secondesRestantes > 1 ? 's' : ''} pour
+          Par sécurité, vous serez déconnecté dans {secondesRestantes} seconde{secondesRestantes > 1 ? 's' : ''} pour
           inactivité.
         </p>
         <button

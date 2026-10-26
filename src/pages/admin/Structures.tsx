@@ -126,7 +126,7 @@ export default function Structures() {
       .insert(couleursDisponibles ? { name: nom, color: couleur } : { name: nom });
     setCreation(false);
     if (error) {
-      setErreurCreation(messageErreur(error.code, 'La création a échoué. Réessaie dans un instant.'));
+      setErreurCreation(messageErreur(error.code, 'La création a échoué. Réessayez dans un instant.'));
       return;
     }
     setNomNouvelle('');
@@ -163,7 +163,7 @@ export default function Structures() {
     const { error } = await supabase.from('structures').update({ color: couleur }).eq('id', s.id);
     setCouleurEnCours(null);
     if (error) {
-      setErreurLigne({ id: s.id, message: "La couleur n'a pas pu être enregistrée. Réessaie dans un instant." });
+      setErreurLigne({ id: s.id, message: "La couleur n'a pas pu être enregistrée. Réessayez dans un instant." });
       await charger();
       return;
     }
@@ -206,8 +206,8 @@ export default function Structures() {
           <p className="font-medium mb-1">Le choix des couleurs n'est pas encore activé.</p>
           <p>
             Il faut d'abord exécuter une fois la mise à jour de la base de données : dans Supabase, menu SQL
-            Editor, colle le contenu du fichier <span className="font-mono text-xs">20261010090000_couleurs_structures.sql</span>{' '}
-            (dossier supabase/migrations du dépôt GitHub), puis clique sur Run. Recharge ensuite cette page.
+            Editor, collez le contenu du fichier <span className="font-mono text-xs">20261010090000_couleurs_structures.sql</span>{' '}
+            (dossier supabase/migrations du dépôt GitHub), puis cliquez sur Run. Rechargez ensuite cette page.
           </p>
         </div>
       )}

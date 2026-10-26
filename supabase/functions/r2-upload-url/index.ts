@@ -136,7 +136,7 @@ Deno.serve(async (req: Request) => {
     if (action === 'read') {
       if (usage.class_b_count + 1 > quotaClasseB) {
         return json(
-          { error: 'Quota mensuel de lecture atteint. Contacte l’administrateur.' },
+          { error: 'Quota mensuel de lecture atteint. Contactez l’administrateur.' },
           429
         );
       }
@@ -164,12 +164,12 @@ Deno.serve(async (req: Request) => {
     }
 
     if (usage.class_a_count + 1 > quotaClasseA) {
-      return json({ error: 'Quota mensuel d’envoi atteint. Contacte l’administrateur.' }, 429);
+      return json({ error: 'Quota mensuel d’envoi atteint. Contactez l’administrateur.' }, 429);
     }
     const quotaOctets = quotaGoParMois * 1_000_000_000;
     if (usage.bytes_uploaded + fileSize > quotaOctets) {
       return json(
-        { error: 'Quota mensuel de volume envoyé (Go) atteint. Contacte l’administrateur.' },
+        { error: 'Quota mensuel de volume envoyé (Go) atteint. Contactez l’administrateur.' },
         429
       );
     }

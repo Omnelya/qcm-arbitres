@@ -164,14 +164,14 @@ export default function QuizAttemptResult() {
 
       {showScore && (
         <div className="bg-surface border border-border rounded p-5 text-center mb-6">
-          <p className="text-sm text-muted mb-1">Ton score</p>
+          <p className="text-sm text-muted mb-1">Votre score</p>
           <p className="text-3xl font-semibold">{score !== null ? formatPourcentage(score) : '—'}</p>
         </div>
       )}
 
       {!showScore && (
         <div className="bg-surface border border-border rounded p-5 text-center mb-6">
-          <p className="text-sm">Ta réponse a bien été enregistrée et soumise.</p>
+          <p className="text-sm">Votre réponse a bien été enregistrée et soumise.</p>
         </div>
       )}
 
@@ -218,7 +218,7 @@ export default function QuizAttemptResult() {
                                 : "Revoir l'image"}
                           </button>
                           {erreurMedia === q.id && (
-                            <span className="text-xs text-card-red">Échec du chargement, réessaie.</span>
+                            <span className="text-xs text-card-red">Échec du chargement, réessayez.</span>
                           )}
                         </div>
                       )}

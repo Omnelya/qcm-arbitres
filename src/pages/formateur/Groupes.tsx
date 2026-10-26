@@ -96,7 +96,7 @@ export default function Groupes() {
     ]);
 
     if (err1) {
-      setErreur('Impossible de charger les groupes. Réessaie dans un instant.');
+      setErreur('Impossible de charger les groupes. Réessayez dans un instant.');
       setLoading(false);
       return;
     }
@@ -169,7 +169,7 @@ export default function Groupes() {
     e.preventDefault();
     if (!session || !nomNouveauGroupe.trim()) return;
     if (structuresDisponibles && !structureNouveauGroupe) {
-      setErreurCreation('Choisis la structure dans laquelle créer ce groupe.');
+      setErreurCreation('Choisissez la structure dans laquelle créer ce groupe.');
       return;
     }
     setCreation(true);
@@ -181,7 +181,7 @@ export default function Groupes() {
     );
     setCreation(false);
     if (error) {
-      setErreurCreation('La création du groupe a échoué. Réessaie dans un instant.');
+      setErreurCreation('La création du groupe a échoué. Réessayez dans un instant.');
       return;
     }
     setNomNouveauGroupe('');
@@ -196,7 +196,7 @@ export default function Groupes() {
     const { error } = await supabase.from('groups').update({ structure_id: structureId }).eq('id', g.id);
     setRattachementEnCours(null);
     if (error) {
-      setErreurRattachement({ id: g.id, message: 'Le rattachement a échoué. Réessaie dans un instant.' });
+      setErreurRattachement({ id: g.id, message: 'Le rattachement a échoué. Réessayez dans un instant.' });
       return;
     }
     await charger();
@@ -211,7 +211,7 @@ export default function Groupes() {
           .eq('group_id', groupId)
           .eq('shared_with_user_id', formateurId)
       : await supabase.from('group_shares').insert({ group_id: groupId, shared_with_user_id: formateurId });
-    if (error) setErreurPartage('Le partage a échoué. Réessaie dans un instant.');
+    if (error) setErreurPartage('Le partage a échoué. Réessayez dans un instant.');
     await charger();
   }
 
@@ -269,8 +269,8 @@ export default function Groupes() {
 
       {sansStructure ? (
         <p className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2 mb-6">
-          Tu n'es rattaché à aucune structure pour le moment : tu ne peux pas encore créer de groupe. Contacte
-          l'administrateur pour qu'il t'affecte à ta structure.
+          Vous n'êtes rattaché à aucune structure pour le moment : vous ne pouvez pas encore créer de groupe. Contactez
+          l'administrateur pour qu'il vous affecte à votre structure.
         </p>
       ) : (
         <form onSubmit={creerGroupe} className="mb-6">
@@ -336,12 +336,12 @@ export default function Groupes() {
             {structuresDisponibles && !g.structure_id && (
               <div className="bg-card-yellow-bg rounded px-3 py-2 mb-2">
                 <p className="text-xs text-card-yellow mb-2">
-                  Ce groupe n'est rattaché à aucune structure. Rattache-le pour pouvoir modifier ses membres ou
+                  Ce groupe n'est rattaché à aucune structure. Rattachez-le pour pouvoir modifier ses membres ou
                   le partager. Ce choix est définitif.
                 </p>
                 {structures.length === 0 ? (
                   <p className="text-xs text-muted">
-                    Tu n'es rattaché à aucune structure : contacte l'administrateur.
+                    Vous n'êtes rattaché à aucune structure : contactez l'administrateur.
                   </p>
                 ) : (
                   <>
@@ -473,7 +473,7 @@ export default function Groupes() {
 
       {groupesPartages.length > 0 && (
         <>
-          <p className="text-sm font-medium mb-2">Partagés avec toi</p>
+          <p className="text-sm font-medium mb-2">Partagés avec vous</p>
           <ul className="flex flex-col gap-2">
             {groupesPartages.map((g) => (
               <li key={g.id} className="bg-surface border border-border rounded p-3">
@@ -511,7 +511,7 @@ export default function Groupes() {
 
                 {structuresDisponibles && !structures.some((s) => s.id === g.structure_id) ? (
                   <p className="text-xs text-muted">
-                    Duplication impossible : ce groupe n'est pas rattaché à l'une de tes structures.
+                    Duplication impossible : ce groupe n'est pas rattaché à l'une de vos structures.
                   </p>
                 ) : (
                   <button

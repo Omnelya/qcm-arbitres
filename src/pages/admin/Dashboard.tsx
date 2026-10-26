@@ -84,7 +84,7 @@ export default function AdminDashboard() {
       ]);
 
       if (err1) {
-        setErreur('Impossible de charger la vue d’ensemble. Réessaie dans un instant.');
+        setErreur('Impossible de charger la vue d’ensemble. Réessayez dans un instant.');
         setLoading(false);
         return;
       }

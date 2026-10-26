@@ -153,10 +153,10 @@ export default function PiocherBanque({
     const { data, error } = await supabase.rpc('banque_copier', { p_quiz: quizId, p_questions: [...cochees] });
     setOccupe(false);
     if (error) {
-      setErreur('L’ajout a échoué. Rien n’a été ajouté, réessaie dans un instant.');
+      setErreur('L’ajout a échoué. Rien n’a été ajouté, réessayez dans un instant.');
       return;
     }
-    setInfo(`${data ?? 0} question(s) ajoutée(s) à ton QCM.`);
+    setInfo(`${data ?? 0} question(s) ajoutée(s) à votre QCM.`);
     setCochees(new Set());
     onAjoute();
     chargerListe();
@@ -173,10 +173,10 @@ export default function PiocherBanque({
     });
     setOccupe(false);
     if (error) {
-      setErreur('L’ajout au hasard a échoué. Rien n’a été ajouté, réessaie dans un instant.');
+      setErreur('L’ajout au hasard a échoué. Rien n’a été ajouté, réessayez dans un instant.');
       return;
     }
-    setInfo(`${data ?? 0} question(s) ajoutée(s) au hasard à ton QCM.`);
+    setInfo(`${data ?? 0} question(s) ajoutée(s) au hasard à votre QCM.`);
     onAjoute();
     chargerListe();
   }
@@ -213,7 +213,7 @@ export default function PiocherBanque({
           }}
         >
           <p className="text-xs text-muted mb-3">
-            Les questions sont <b>copiées</b> dans ton QCM : tu pourras ensuite les modifier sans toucher à la banque.
+            Les questions sont <b>copiées</b> dans votre QCM : vous pourrez ensuite les modifier sans toucher à la banque.
           </p>
           {erreur && (
             <p role="alert" className="text-sm text-card-red bg-card-red-bg rounded-xl px-3 py-2 mb-3">
@@ -388,7 +388,7 @@ export default function PiocherBanque({
             disabled={occupe || cochees.size === 0}
             className="w-full bg-pitch text-white font-semibold rounded-xl py-2.5 disabled:opacity-50"
           >
-            {occupe ? 'Patiente…' : `Ajouter ${cochees.size} question(s) à mon QCM`}
+            {occupe ? 'Patientez…' : `Ajouter ${cochees.size} question(s) à mon QCM`}
           </button>
         </div>
       </div>

@@ -20,7 +20,7 @@ function traduireErreur(message?: string): string {
   if (message?.includes('quizzes_period_valid')) {
     return 'La date de fin doit être après (ou égale à) la date de début.';
   }
-  return "L'enregistrement a échoué. Vérifie les champs et réessaie.";
+  return "L'enregistrement a échoué. Vérifiez les champs et réessayez.";
 }
 
 // Convertit un instant ISO (venant de la base) vers le format attendu par
@@ -151,12 +151,12 @@ export default function QuizForm() {
     if (!id) return;
     if (!valeurs.titre.trim()) {
       setEtatSauvegarde('erreur');
-      setMessageSauvegarde('Donne un titre au QCM pour que les modifications soient enregistrées.');
+      setMessageSauvegarde('Donnez un titre au QCM pour que les modifications soient enregistrées.');
       return;
     }
     if (!valeurs.dateDebut || !valeurs.dateFin || !(valeurs.dureeMinutes >= 1)) {
       setEtatSauvegarde('erreur');
-      setMessageSauvegarde('Renseigne la durée et les deux dates pour que les modifications soient enregistrées.');
+      setMessageSauvegarde('Renseignez la durée et les deux dates pour que les modifications soient enregistrées.');
       return;
     }
     setEtatSauvegarde('en_cours');
@@ -194,7 +194,7 @@ export default function QuizForm() {
           : { error: errDelete };
       if (errDelete || errInsert) {
         setEtatSauvegarde('erreur');
-        setMessageSauvegarde("Les groupes destinataires n'ont pas pu être enregistrés. Réessaie dans un instant.");
+        setMessageSauvegarde("Les groupes destinataires n'ont pas pu être enregistrés. Réessayez dans un instant.");
         return;
       }
       derniersGroupesSauves.current = cleGroupes;
@@ -318,7 +318,7 @@ export default function QuizForm() {
       supabase.from('quiz_groups').delete().eq('quiz_id', id as string)
     );
     if (errDeleteGroupes) {
-      setErreur("Impossible de mettre à jour les groupes ciblés. Réessaie dans un instant.");
+      setErreur("Impossible de mettre à jour les groupes ciblés. Réessayez dans un instant.");
       setEnregistrement(false);
       return;
     }
@@ -361,7 +361,7 @@ export default function QuizForm() {
       await logActivity(`a supprimé le brouillon « ${titre} »`, 'quiz', id);
       navigate('/formateur');
     } else {
-      setErreur('La suppression a échoué. Réessaie dans un instant.');
+      setErreur('La suppression a échoué. Réessayez dans un instant.');
     }
   }
 
@@ -372,7 +372,7 @@ export default function QuizForm() {
 
     const { data: nouveauId, error } = await supabase.rpc('dupliquer_qcm', { p_quiz_id: id });
     if (error || !nouveauId) {
-      setErreur('La duplication a échoué. Réessaie dans un instant.');
+      setErreur('La duplication a échoué. Réessayez dans un instant.');
       setDuplication(false);
       return;
     }
@@ -437,7 +437,7 @@ export default function QuizForm() {
           <div className="bg-surface rounded-lg p-5 max-w-sm w-full text-center">
             <p className="text-lg font-semibold mb-2">Aucun groupe sélectionné</p>
             <p className="text-sm text-muted mb-4">
-              Sélectionne au moins un groupe destinataire avant de publier ce QCM : sans groupe,
+              Sélectionnez au moins un groupe destinataire avant de publier ce QCM : sans groupe,
               aucun arbitre ne pourra y accéder.
             </p>
             <button

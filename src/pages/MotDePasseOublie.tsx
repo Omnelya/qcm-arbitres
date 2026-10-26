@@ -26,8 +26,8 @@ export default function MotDePasseOublie() {
     if (error) {
       setErreur(
         error.message.toLowerCase().includes('rate limit')
-          ? 'Trop de demandes ont été envoyées récemment. Réessaie dans quelques minutes.'
-          : "L'envoi a échoué. Réessaie dans un instant."
+          ? 'Trop de demandes ont été envoyées récemment. Réessayez dans quelques minutes.'
+          : "L'envoi a échoué. Réessayez dans un instant."
       );
       return;
     }
@@ -39,15 +39,15 @@ export default function MotDePasseOublie() {
       <div className="w-full max-w-sm">
         <h1 className="text-xl font-semibold mb-1">Mot de passe oublié</h1>
         <p className="text-sm text-muted mb-6">
-          Saisis ton e-mail : si un compte existe, un lien pour choisir un nouveau mot de passe te
+          Saisissez votre e-mail : si un compte existe, un lien pour choisir un nouveau mot de passe vous
           sera envoyé.
         </p>
 
         {envoye ? (
           <div className="bg-surface border border-border rounded p-5 text-sm">
             <p className="mb-4">
-              Si un compte existe avec cette adresse, un e-mail vient d'être envoyé. Vérifie ta
-              boîte de réception (et tes indésirables).
+              Si un compte existe avec cette adresse, un e-mail vient d'être envoyé. Vérifiez votre
+              boîte de réception (et vos indésirables).
             </p>
             <Link to="/login" className="text-pitch underline">
               ← Retour à la connexion

@@ -203,7 +203,7 @@ export default function Comptes() {
     const connexionsDisponibles = Array.isArray(connexions);
 
     if (err1 || err2) {
-      setError('Impossible de charger la liste des comptes. Réessaie dans un instant.');
+      setError('Impossible de charger la liste des comptes. Réessayez dans un instant.');
       setLoading(false);
       return;
     }
@@ -272,7 +272,7 @@ export default function Comptes() {
       ? await supabase.from('user_structures').delete().eq('user_id', p.id).eq('structure_id', structure.id)
       : await supabase.from('user_structures').insert({ user_id: p.id, structure_id: structure.id });
     if (err) {
-      setErreurStructure("La modification de la structure a échoué. Réessaie dans un instant.");
+      setErreurStructure("La modification de la structure a échoué. Réessayez dans un instant.");
     } else {
       await logActivity(
         actif
@@ -369,7 +369,7 @@ export default function Comptes() {
     setLienPanneauCopie(false);
 
     if (p.roles.length === 0) {
-      setErreurLienPanneau('Attribue au moins un rôle avant de générer un lien.');
+      setErreurLienPanneau('Attribuez au moins un rôle avant de générer un lien.');
       return;
     }
 
@@ -398,7 +398,7 @@ export default function Comptes() {
     setRenvoiEmailConfirmation(null);
 
     if (p.roles.length === 0) {
-      setErreurRenvoiEmail('Attribue au moins un rôle avant de renvoyer un lien.');
+      setErreurRenvoiEmail('Attribuez au moins un rôle avant de renvoyer un lien.');
       return;
     }
 
@@ -420,7 +420,7 @@ export default function Comptes() {
     }
     if (!data.envoye) {
       setErreurRenvoiEmail(
-        data.erreurEnvoi ?? "L'envoi a échoué. Utilise plutôt « Générer un nouveau lien d'activation » pour le copier toi-même."
+        data.erreurEnvoi ?? "L'envoi a échoué. Utilisez plutôt « Générer un nouveau lien d'activation » pour le copier vous-même."
       );
       return;
     }
@@ -491,7 +491,7 @@ export default function Comptes() {
     setLienGenere(null);
 
     if (rolesCreation.length === 0) {
-      setErreurCreation('Sélectionne au moins un rôle.');
+      setErreurCreation('Sélectionnez au moins un rôle.');
       return;
     }
 
@@ -567,14 +567,14 @@ export default function Comptes() {
       ['Colonne "Rôle" : exactement admin, formateur ou arbitre (un seul par ligne).'],
       ["Un 2e rôle pourra être ajouté ensuite depuis la fiche du compte, une fois créé."],
       [
-        'Colonne "Structure" (facultative) : nom exact d\'une structure existante. Pour plusieurs structures, sépare les noms par un point-virgule (ex. Structure A;Structure B).',
+        'Colonne "Structure" (facultative) : nom exact d\'une structure existante. Pour plusieurs structures, séparez les noms par un point-virgule (ex. Structure A;Structure B).',
       ],
       [
         structures.length > 0
           ? `Structures existantes : ${structures.map((s) => s.name).join(' ; ')}`
           : "Aucune structure n'existe pour le moment (onglet Structures).",
       ],
-      ["Supprime la ligne d'exemple (Jean Dupont) avant de déposer le fichier."],
+      ["Supprimez la ligne d'exemple (Jean Dupont) avant de déposer le fichier."],
     ]);
     const classeur = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(classeur, feuilleComptes, 'Comptes');
@@ -635,7 +635,7 @@ export default function Comptes() {
         const trouvee = structures.find((s) => s.name.trim().toLowerCase() === nomS.toLowerCase());
         if (!trouvee) {
           erreurs.push(
-            `Ligne ${numeroLigne} : structure "${nomS}" inconnue (crée-la d'abord dans l'onglet Structures, ou corrige le nom).`
+            `Ligne ${numeroLigne} : structure "${nomS}" inconnue (créez-la d'abord dans l'onglet Structures, ou corrigez le nom).`
           );
           return;
         }
@@ -869,7 +869,7 @@ export default function Comptes() {
               <div className="flex flex-col gap-1.5 mb-3">
                 {structures.length === 0 && (
                   <p className="text-xs text-muted">
-                    Aucune structure pour le moment : crée-les dans l'onglet Structures.
+                    Aucune structure pour le moment : créez-les dans l'onglet Structures.
                   </p>
                 )}
                 {structures.map((s) => (
@@ -922,7 +922,7 @@ export default function Comptes() {
               <p className="text-sm text-pitch-dark bg-pitch-light rounded-t px-3 py-2">
                 {lienEstRenvoi
                   ? 'Un compte existait déjà pour cet e-mail (invitation précédente) : voici un nouveau lien à transmettre.'
-                  : 'Compte créé. Transmets ce lien à la personne concernée :'}
+                  : 'Compte créé. Transmettez ce lien à la personne concernée :'}
               </p>
               <div className="flex gap-2 border border-t-0 border-border rounded-b p-2">
                 <input
@@ -958,7 +958,7 @@ export default function Comptes() {
       {importOuvert && (
         <div className="bg-surface border border-border rounded p-4 mb-4">
           <p className="text-sm text-muted mb-3">
-            Dépose un fichier Excel listant plusieurs comptes à créer d'un coup. Toutes les invitations sont
+            Déposez un fichier Excel listant plusieurs comptes à créer d'un coup. Toutes les invitations sont
             envoyées automatiquement par e-mail, au fur et à mesure.
           </p>
           <div className="flex gap-2 mb-3">
@@ -1309,7 +1309,7 @@ export default function Comptes() {
                     <div className="flex flex-col gap-2">
                       {structures.length === 0 && (
                         <p className="text-xs text-muted">
-                          Aucune structure pour le moment : crée-les dans l'onglet Structures.
+                          Aucune structure pour le moment : créez-les dans l'onglet Structures.
                         </p>
                       )}
                       {structures.map((s) => {
@@ -1357,14 +1357,14 @@ export default function Comptes() {
                   {erreurMdp && <p className="text-xs text-card-red">{erreurMdp}</p>}
                   {succesMdp && <p className="text-xs text-pitch-dark">Mot de passe mis à jour.</p>}
                   <ReglesMotDePasse motDePasse={nouveauMotDePasse} />
-                  <p className="text-xs text-muted -mt-2">Transmets-le à la personne concernée.</p>
+                  <p className="text-xs text-muted -mt-2">Transmettez-le à la personne concernée.</p>
                 </div>
 
                 <div>
                   <label className="block text-xs text-muted mb-1">Lien d'activation</label>
                   <p className="text-xs text-muted mb-1.5">
                     Si la personne n'a pas reçu ou a perdu son lien pour choisir elle-même son mot de
-                    passe, génère un nouveau lien à lui transmettre.
+                    passe, générez un nouveau lien à lui transmettre.
                   </p>
                   <div className="flex flex-wrap gap-2">
                     <button

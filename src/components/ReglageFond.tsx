@@ -99,7 +99,7 @@ export default function ReglageFond({
   return (
     <div className="bg-surface rounded-2xl border border-border p-4">
       <p className="text-xs text-muted mb-2">
-        Le cadre vert est la zone des questions et réponses. Approche la souris d'un côté ou d'un coin pour l'étirer (double flèche), ou glisse à l'intérieur pour le
+        Le cadre vert est la zone des questions et réponses. Approchez la souris d'un côté ou d'un coin pour l'étirer (double flèche), ou glissez à l'intérieur pour le
         déplacer.
       </p>
 

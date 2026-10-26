@@ -202,7 +202,7 @@ export default function QuizResultats() {
       const blob = new Blob([lignesCsv.join('\n')], { type: 'text/csv;charset=utf-8;' });
       telecharger(blob, `${titre}.csv`);
     } catch {
-      setErreur("L'export CSV a échoué. Réessaie dans un instant.");
+      setErreur("L'export CSV a échoué. Réessayez dans un instant.");
     } finally {
       setExportEnCours(null);
     }
@@ -290,7 +290,7 @@ export default function QuizResultats() {
 
       XLSX.writeFile(classeur, `${titre}.xlsx`);
     } catch {
-      setErreur("L'export Excel a échoué. Réessaie dans un instant.");
+      setErreur("L'export Excel a échoué. Réessayez dans un instant.");
     } finally {
       setExportEnCours(null);
     }
@@ -310,7 +310,7 @@ export default function QuizResultats() {
         `${titre} - Correction.pptx`
       );
     } catch {
-      setErreur("L'export PowerPoint a échoué. Réessaie dans un instant.");
+      setErreur("L'export PowerPoint a échoué. Réessayez dans un instant.");
     } finally {
       setExportEnCours(null);
     }
@@ -340,7 +340,7 @@ export default function QuizResultats() {
       await logActivity(`a supprimé le QCM « ${titre} »`, 'quiz', quizId);
       navigate(basePath);
     } else {
-      setErreur('La suppression a échoué. Réessaie dans un instant.');
+      setErreur('La suppression a échoué. Réessayez dans un instant.');
     }
   }
 
@@ -388,7 +388,7 @@ export default function QuizResultats() {
           ) : (
             <div>
               <div className="flex items-center justify-between gap-2 mb-2">
-                <p className="text-sm">Décoche les arbitres à ne pas relancer :</p>
+                <p className="text-sm">Décochez les arbitres à ne pas relancer :</p>
                 <button
                   type="button"
                   onClick={() =>
@@ -551,8 +551,8 @@ export default function QuizResultats() {
           </p>
           {lignes.some((l) => l.statut !== 'non_repondu') && (
             <p className="text-xs text-muted mb-3">
-              Des réponses ont déjà été reçues — pense à exporter les résultats ci-dessus avant de
-              continuer si tu veux les garder.
+              Des réponses ont déjà été reçues — pensez à exporter les résultats ci-dessus avant de
+              continuer si vous voulez les garder.
             </p>
           )}
           <div className="flex gap-2">

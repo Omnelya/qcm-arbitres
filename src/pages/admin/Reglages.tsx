@@ -43,7 +43,7 @@ export default function Reglages() {
       const { data: reglages, error: err1 } = await supabase.from('app_settings').select('key, value');
 
       if (err1) {
-        setErreur('Impossible de charger les réglages. Réessaie dans un instant.');
+        setErreur('Impossible de charger les réglages. Réessayez dans un instant.');
         setLoading(false);
         return;
       }
@@ -112,7 +112,7 @@ export default function Reglages() {
     const error = resultats.find((r) => r.error)?.error ?? null;
     setEnregistrement(false);
     if (error) {
-      setErreur("L'enregistrement a échoué. Réessaie dans un instant.");
+      setErreur("L'enregistrement a échoué. Réessayez dans un instant.");
     } else {
       setConfirmation(true);
     }
@@ -185,7 +185,7 @@ export default function Reglages() {
                 {usageReel.diagnostic.comptesRenvoyes === 0
                   ? "Cloudflare n'a renvoyé aucun compte : le jeton CF_API_TOKEN n'a sans doute pas la permission « Account Analytics : Read » sur ce compte, ou R2_ACCOUNT_ID est incorrect."
                   : usageReel.diagnostic.bucketNonTrouve
-                    ? `Le bucket configuré « ${usageReel.diagnostic.bucketConfigure} » est introuvable côté Cloudflare (buckets vus : ${usageReel.diagnostic.bucketsVus.join(', ') || 'aucun'}). Vérifie le secret R2_BUCKET_NAME.`
+                    ? `Le bucket configuré « ${usageReel.diagnostic.bucketConfigure} » est introuvable côté Cloudflare (buckets vus : ${usageReel.diagnostic.bucketsVus.join(', ') || 'aucun'}). Vérifiez le secret R2_BUCKET_NAME.`
                     : "Cloudflare n'a renvoyé aucune donnée pour ce mois-ci (compte et bucket reconnus, mais aucune activité enregistrée)."}
               </p>
             )}

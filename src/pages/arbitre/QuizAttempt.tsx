@@ -73,7 +73,7 @@ export default function QuizAttempt() {
       if (error) {
         setSoumission(false);
         setErreur(
-          "L'envoi de tes réponses a échoué. Vérifie ta connexion et réessaie — tes réponses déjà cochées sont conservées."
+          "L'envoi de vos réponses a échoué. Vérifiez votre connexion et réessayez — vos réponses déjà cochées sont conservées."
         );
         return;
       }
@@ -143,7 +143,7 @@ export default function QuizAttempt() {
         p_quiz_id: quizId,
       });
       if (errQuestions || !questionsData) {
-        setErreur("Impossible de charger les questions. Réessaie dans un instant.");
+        setErreur("Impossible de charger les questions. Réessayez dans un instant.");
         setLoading(false);
         return;
       }
@@ -232,7 +232,7 @@ export default function QuizAttempt() {
       supabase.from('selected_answers').delete().eq('attempt_id', attemptId).eq('question_id', questionId)
     );
     if (errDelete) {
-      setErreurSelection("Tes réponses n'ont pas pu être enregistrées. Réessaie dans un instant.");
+      setErreurSelection("Vos réponses n'ont pas pu être enregistrées. Réessayez dans un instant.");
       return false;
     }
     if (choix.size > 0) {
@@ -240,7 +240,7 @@ export default function QuizAttempt() {
         .from('selected_answers')
         .insert(Array.from(choix).map((optionId) => ({ attempt_id: attemptId, question_id: questionId, option_id: optionId })));
       if (errInsert) {
-        setErreurSelection("Tes réponses n'ont pas pu être enregistrées. Réessaie dans un instant.");
+        setErreurSelection("Vos réponses n'ont pas pu être enregistrées. Réessayez dans un instant.");
         return false;
       }
     }
@@ -326,7 +326,7 @@ export default function QuizAttempt() {
       {finParPeriode && (
         <p className="text-xs text-card-yellow bg-card-yellow-bg rounded px-3 py-2 mb-3">
           La période de ce QCM se termine à{' '}
-          {new Date(finParPeriode).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} : tes
+          {new Date(finParPeriode).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} : vos
           réponses déjà cochées seront alors envoyées automatiquement.
         </p>
       )}
@@ -363,7 +363,7 @@ export default function QuizAttempt() {
             )
           ) : erreurMedia ? (
             <div className="flex flex-col items-center gap-2 px-4 text-center">
-              <span className="text-xs text-card-red">Le média n'a pas pu être chargé. Vérifie ta connexion.</span>
+              <span className="text-xs text-card-red">Le média n'a pas pu être chargé. Vérifiez votre connexion.</span>
               <button
                 type="button"
                 onClick={() => setTentativeMedia((n) => n + 1)}
@@ -381,7 +381,7 @@ export default function QuizAttempt() {
       <p className="text-base font-medium mb-1">{questionActuelle.text}</p>
       {afficherNombreAttendu && (
         <p className="text-xs text-muted mb-4">
-          Choisis jusqu'à {questionActuelle.max_selectable} réponse(s)
+          Choisissez jusqu'à {questionActuelle.max_selectable} réponse(s)
         </p>
       )}
 

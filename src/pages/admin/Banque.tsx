@@ -87,7 +87,7 @@ function Confirmation({
             disabled={enCours}
             className="flex-1 bg-card-red text-white rounded-xl py-2.5 text-sm font-semibold disabled:opacity-60"
           >
-            {enCours ? 'Patiente…' : bouton}
+            {enCours ? 'Patientez…' : bouton}
           </button>
         </div>
       </div>
@@ -224,7 +224,7 @@ function DetailBanque({
       ? await supabase.from('banque_structures').delete().eq('banque_id', banque.id).eq('structure_id', id)
       : await supabase.from('banque_structures').insert({ banque_id: banque.id, structure_id: id });
     if (error) {
-      setErreur('Impossible de modifier les structures. Réessaie dans un instant.');
+      setErreur('Impossible de modifier les structures. Réessayez dans un instant.');
       return;
     }
     setStructureIds((prev) => (present ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -308,7 +308,7 @@ function DetailBanque({
     const { error } = await supabase.from('banques').delete().eq('id', banque.id);
     setSuppressionBanque(false);
     if (error) {
-      setErreurSuppression('La suppression a échoué. Réessaie dans un instant.');
+      setErreurSuppression('La suppression a échoué. Réessayez dans un instant.');
       return;
     }
     await logActivity(`a supprimé la banque de questions « ${banque.name} »`, 'banque', banque.id);
@@ -373,7 +373,7 @@ function DetailBanque({
       <section className="bg-surface border border-border rounded p-4 mb-4">
         <h2 className="font-bold mb-1">Thèmes</h2>
         <p className="text-sm text-muted mb-3">
-          Crée des thèmes (ex. : Terrain, Sanctions, Hors-jeu), puis range les questions dedans ci-dessous. Les
+          Créez des thèmes (ex. : Terrain, Sanctions, Hors-jeu), puis rangez les questions dedans ci-dessous. Les
           formateurs pourront filtrer par thème.
         </p>
         <ul className="mb-3">
@@ -664,7 +664,7 @@ export default function Banque() {
       .select('id, name, banque_questions(count), banque_themes(count), banque_structures(structure_id)')
       .order('name');
     if (error) {
-      setErreurListe('Impossible de charger les banques. As-tu bien exécuté le SQL de la banque dans Supabase ?');
+      setErreurListe('Impossible de charger les banques. Avez-vous bien exécuté le SQL de la banque dans Supabase ?');
     } else {
       setErreurListe(null);
       setBanques(
@@ -711,14 +711,14 @@ export default function Banque() {
       });
       const resultat = lireQuestionsBanque(lignes);
       if (resultat.questions.length === 0) {
-        setErreurFichier('Aucune question reconnue dans ce fichier. Vérifie le format (Q1., puis [X] / [ ] pour les réponses).');
+        setErreurFichier('Aucune question reconnue dans ce fichier. Vérifiez le format (Q1., puis [X] / [ ] pour les réponses).');
         return;
       }
       setLecture(resultat);
       setNomFichier(fichier.name);
       if (!nom.trim()) setNom(fichier.name.replace(/\.xlsx?$/i, '').replace(/_+/g, ' ').trim());
     } catch {
-      setErreurFichier('Ce fichier n’a pas pu être lu. Utilise un fichier Excel (.xlsx).');
+      setErreurFichier('Ce fichier n’a pas pu être lu. Utilisez un fichier Excel (.xlsx).');
     }
   }
 
@@ -735,8 +735,8 @@ export default function Banque() {
     if (error) {
       setErreurImport(
         error.code === '23505'
-          ? 'Une banque porte déjà ce nom. Choisis un autre nom.'
-          : 'L’import a échoué, rien n’a été enregistré. Réessaie dans un instant.'
+          ? 'Une banque porte déjà ce nom. Choisissez un autre nom.'
+          : 'L’import a échoué, rien n’a été enregistré. Réessayez dans un instant.'
       );
       return;
     }
@@ -840,10 +840,10 @@ export default function Banque() {
                     </li>
                   ))}
                   {structures.length === 0 && (
-                    <li className="text-sm text-muted">Aucune structure : crées-en d’abord dans l’onglet Structures.</li>
+                    <li className="text-sm text-muted">Aucune structure : créez-en d’abord dans l’onglet Structures.</li>
                   )}
                 </ul>
-                <p className="text-xs text-muted mb-3">Tu pourras modifier ce choix plus tard.</p>
+                <p className="text-xs text-muted mb-3">Vous pourrez modifier ce choix plus tard.</p>
 
                 {erreurImport && (
                   <p role="alert" className="text-sm text-card-red bg-card-red-bg rounded-xl px-3 py-2 mb-3">

@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
         sent_at: new Date().toISOString(),
         user_id: created.user.id,
         erreur: rolesErr
-          ? "Compte créé et e-mail envoyé, mais les rôles n'ont pas pu être attribués : attribue-les manuellement dans Comptes."
+          ? "Compte créé et e-mail envoyé, mais les rôles n'ont pas pu être attribués : attribuez-les manuellement dans Comptes."
           : null,
       })
       .eq('id', invite.id);

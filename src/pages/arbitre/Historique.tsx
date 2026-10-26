@@ -143,7 +143,7 @@ export default function Historique() {
       ]);
 
       if (err1) {
-        setErreur('Impossible de charger ton historique. Réessaie dans un instant.');
+        setErreur('Impossible de charger votre historique. Réessayez dans un instant.');
         setLoading(false);
         return;
       }

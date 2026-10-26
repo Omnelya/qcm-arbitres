@@ -75,12 +75,12 @@ function construireEmailInvitationHtml(prenom: string, lienActivation: string): 
         </td></tr>
 
         <tr><td style="padding:0 40px 30px;text-align:center;">
-          <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">Un compte a été créé pour toi sur la plateforme QCM Arbitres. Clique sur le bouton ci-dessous pour définir ton mot de passe et activer ton compte.</p>
+          <p style="margin:0 0 22px;font-size:15px;line-height:1.6;color:#1A1D1B;font-family:Inter,Arial,sans-serif;">Un compte a été créé pour vous sur la plateforme QCM Arbitres. Cliquez sur le bouton ci-dessous pour définir votre mot de passe et activer votre compte.</p>
           <a href="${lienActivation}" style="display:inline-block;background:#C99A2E;color:#1A1D1B;text-decoration:none;font-size:15px;font-weight:700;padding:12px 32px;border-radius:24px;font-family:Inter,Arial,sans-serif;">Activer mon compte</a>
         </td></tr>
 
         <tr><td style="padding:18px 40px;border-top:1px solid #E3E1DB;text-align:center;">
-          <p style="margin:0;font-size:12px;line-height:1.6;color:#6B6B64;font-family:Inter,Arial,sans-serif;">Ce lien est valable une seule fois. Si tu n'es pas à l'origine de cette demande, tu peux ignorer cet e-mail.</p>
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#6B6B64;font-family:Inter,Arial,sans-serif;">Ce lien est valable une seule fois. Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet e-mail.</p>
         </td></tr>
 
       </table>
@@ -152,7 +152,7 @@ async function genererLienEtEnvoyer(
       sent_at: new Date().toISOString(),
       user_id: linkData.user!.id,
       erreur: rolesErr
-        ? "Compte créé et e-mail envoyé, mais les rôles n'ont pas pu être attribués : attribue-les manuellement dans Comptes."
+        ? "Compte créé et e-mail envoyé, mais les rôles n'ont pas pu être attribués : attribuez-les manuellement dans Comptes."
         : null,
     })
     .eq('id', ligne.id);
@@ -308,7 +308,7 @@ Deno.serve(async (req: Request) => {
         return json({ error: 'Identifiant requis.' }, 400);
       }
       if (userId === userData.user.id) {
-        return json({ error: 'Tu ne peux pas supprimer ton propre compte.' }, 400);
+        return json({ error: 'Vous ne pouvez pas supprimer votre propre compte.' }, 400);
       }
 
       const { error: deleteErr } = await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -408,7 +408,7 @@ Deno.serve(async (req: Request) => {
         .select('id, full_name, email, roles');
 
       if (insertErr || !inserted) {
-        return json({ error: "La mise en file d'attente a échoué. Réessaie dans un instant." }, 400);
+        return json({ error: "La mise en file d'attente a échoué. Réessayez dans un instant." }, 400);
       }
 
       // Envoi de tout le lot en tâche de fond, espacé de 2s (voir
@@ -511,7 +511,7 @@ Deno.serve(async (req: Request) => {
         .insert(roles.map((role: string) => ({ user_id: linkData.user!.id, role })));
 
       if (rolesErr) {
-        return json({ error: 'Compte créé mais les rôles n\'ont pas pu être attribués. Attribue-les manuellement.' }, 200);
+        return json({ error: 'Compte créé mais les rôles n\'ont pas pu être attribués. Attribuez-les manuellement.' }, 200);
       }
 
       if (envoyerParEmail && linkData.properties?.action_link) {

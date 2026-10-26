@@ -39,8 +39,8 @@ export default function ActiverCompte() {
     if (error) {
       setErreur(
         estLienDeReinitialisation
-          ? 'La mise à jour a échoué. Le lien a peut-être expiré — redemande un lien depuis la page de connexion.'
-          : "L'activation a échoué. Le lien a peut-être expiré — demande à ton administrateur de t'en envoyer un nouveau."
+          ? 'La mise à jour a échoué. Le lien a peut-être expiré — redemandez un lien depuis la page de connexion.'
+          : "L'activation a échoué. Le lien a peut-être expiré — demandez à votre administrateur de vous en envoyer un nouveau."
       );
       return;
     }
@@ -66,8 +66,8 @@ export default function ActiverCompte() {
           <h1 className="text-xl font-semibold mb-2">Lien invalide ou expiré</h1>
           <p className="text-sm text-muted">
             {estLienDeReinitialisation
-              ? "Ce lien n'est plus valable. Redemande un lien depuis la page de connexion."
-              : "Ce lien d'activation n'est plus valable. Demande à ton administrateur de t'en envoyer un nouveau."}
+              ? "Ce lien n'est plus valable. Redemandez un lien depuis la page de connexion."
+              : "Ce lien d'activation n'est plus valable. Demandez à votre administrateur de vous en envoyer un nouveau."}
           </p>
         </div>
       </div>
@@ -84,8 +84,8 @@ export default function ActiverCompte() {
         </h1>
         <p className="text-sm text-muted mb-6">
           {estLienDeReinitialisation
-            ? 'Choisis ton nouveau mot de passe.'
-            : 'Choisis ton mot de passe pour activer ton compte QCM Arbitres.'}
+            ? 'Choisissez votre nouveau mot de passe.'
+            : 'Choisissez votre mot de passe pour activer votre compte QCM Arbitres.'}
         </p>
 
         <form onSubmit={handleSubmit} className="bg-surface border border-border rounded p-5">

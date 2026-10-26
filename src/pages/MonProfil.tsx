@@ -23,7 +23,7 @@ export default function MonProfil() {
   // Code d'erreur renvoyé quand le fichier SQL de la version n'a pas encore
   // été exécuté dans Supabase (la fonction demandée n'existe pas encore).
   const FONCTION_ABSENTE = 'PGRST202';
-  const MESSAGE_PAS_ACTIVE = "Cette fonction n'est pas encore activée sur le site. Réessaie plus tard.";
+  const MESSAGE_PAS_ACTIVE = "Cette fonction n'est pas encore activée sur le site. Réessayez plus tard.";
 
   async function exporterMesDonnees() {
     setErreurExport(null);
@@ -33,7 +33,7 @@ export default function MonProfil() {
 
     if (error || !data) {
       setErreurExport(
-        error?.code === FONCTION_ABSENTE ? MESSAGE_PAS_ACTIVE : "L'export a échoué. Réessaie dans un instant."
+        error?.code === FONCTION_ABSENTE ? MESSAGE_PAS_ACTIVE : "L'export a échoué. Réessayez dans un instant."
       );
       return;
     }
@@ -63,7 +63,7 @@ export default function MonProfil() {
           ? error.message
           : error.code === FONCTION_ABSENTE
             ? MESSAGE_PAS_ACTIVE
-            : 'La suppression a échoué. Réessaie dans un instant.'
+            : 'La suppression a échoué. Réessayez dans un instant.'
       );
       return;
     }
@@ -92,7 +92,7 @@ export default function MonProfil() {
     setEnregistrement(false);
 
     if (error) {
-      setErreur("La mise à jour a échoué. Réessaie dans un instant.");
+      setErreur("La mise à jour a échoué. Réessayez dans un instant.");
       return;
     }
     setMotDePasse('');
@@ -150,7 +150,7 @@ export default function MonProfil() {
       <h2 className="text-sm font-semibold mt-8 mb-2">Mes données personnelles</h2>
       <div className="bg-surface border border-border rounded p-4 mb-4">
         <p className="text-sm text-muted mb-3">
-          Télécharge un fichier avec toutes les données enregistrées à ton sujet.{' '}
+          Téléchargez un fichier avec toutes les données enregistrées à votre sujet.{' '}
           <Link to="/confidentialite" className="underline">
             Politique de confidentialité
           </Link>
@@ -173,7 +173,7 @@ export default function MonProfil() {
       <div className="bg-surface border border-card-red rounded p-4">
         <h3 className="text-sm font-semibold text-card-red mb-1">Supprimer mon compte</h3>
         <p className="text-sm text-muted mb-3">
-          Ton compte, tes résultats et tes réponses sont effacés définitivement. Cette action est
+          Votre compte, vos résultats et vos réponses sont effacés définitivement. Cette action est
           irréversible.
         </p>
 

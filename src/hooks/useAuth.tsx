@@ -136,5 +136,5 @@ function traduireErreur(message: string): string {
   if (message.includes('Invalid login credentials')) {
     return 'E-mail ou mot de passe incorrect.';
   }
-  return "Une erreur est survenue lors de la connexion. Réessaie dans un instant.";
+  return "Une erreur est survenue lors de la connexion. Réessayez dans un instant.";
 }

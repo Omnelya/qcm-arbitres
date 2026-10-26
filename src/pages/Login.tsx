@@ -12,7 +12,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [motDePasseDefini, setMotDePasseDefini] = useState(false);
-  const [compteSupprime, setCompteSupprime] = useState(false);
+  const [compteSupprime, setCompteSupprimez] = useState(false);
   const [deconnecteInactivite, setDeconnecteInactivite] = useState(false);
 
   // Message d'explication après une déconnexion automatique.
@@ -38,7 +38,7 @@ export default function Login() {
       navigate(location.pathname, { replace: true, state: null });
     }
     if (etat?.compteSupprime) {
-      setCompteSupprime(true);
+      setCompteSupprimez(true);
       navigate(location.pathname, { replace: true, state: null });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -57,23 +57,23 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <h1 className="text-xl font-semibold mb-1">QCM Arbitres</h1>
-        <p className="text-sm text-muted mb-6">Connecte-toi avec le compte créé par ton administrateur.</p>
+        <p className="text-sm text-muted mb-6">Connectez-vous avec le compte créé par votre administrateur.</p>
 
         {motDePasseDefini && (
           <p className="text-sm text-pitch-dark bg-pitch-light rounded px-3 py-2 mb-4">
-            Mot de passe défini avec succès. Connecte-toi pour continuer.
+            Mot de passe défini avec succès. Connectez-vous pour continuer.
           </p>
         )}
 
         {compteSupprime && (
           <p className="text-sm text-pitch-dark bg-pitch-light rounded px-3 py-2 mb-4">
-            Ton compte et tes données ont été supprimés.
+            Votre compte et vos données ont été supprimés.
           </p>
         )}
 
         {deconnecteInactivite && !motDePasseDefini && !compteSupprime && (
           <p className="text-sm text-card-yellow bg-card-yellow-bg rounded px-3 py-2 mb-4">
-            Tu as été déconnecté après 5 minutes d'inactivité. Reconnecte-toi pour continuer.
+            Vous avez été déconnecté après 5 minutes d'inactivité. Reconnectez-vous pour continuer.
           </p>
         )}
 
