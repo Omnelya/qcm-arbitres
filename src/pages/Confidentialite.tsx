@@ -119,6 +119,11 @@ export default function Confidentialite() {
               À la suppression d'un compte, le journal d'activité est conservé sans ton nom : l'auteur
               devient « Système ».
             </li>
+            <li>Le journal d'activité est conservé 14 jours.</li>
+            <li>
+              Les e-mails envoyés par l'application (invitations, relances) sont supprimés après 5 mois,
+              puis définitivement après 30 jours de corbeille.
+            </li>
           </ul>
         </section>
 
