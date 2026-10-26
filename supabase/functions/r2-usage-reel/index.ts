@@ -139,7 +139,12 @@ Deno.serve(async (req: Request) => {
 
     // On retient les lignes du bucket configuré (nom comparé sans tenir compte des majuscules) ;
     // si aucune ne correspond alors que Cloudflare en renvoie, on prend tout le compte et on le signale.
-    const memeBucket = (l: any) => String(l?.dimensions?.bucketName ?? '').toLowerCase() === String(bucketName ?? '').toLowerCase();
+    // Cloudflare préfixe le nom des buckets à juridiction (ex. « eu_mon-bucket ») : on accepte aussi ce préfixe.
+    const memeBucket = (l: any) => {
+      const nom = String(l?.dimensions?.bucketName ?? '').toLowerCase();
+      const cible = String(bucketName ?? '').toLowerCase();
+      return nom === cible || nom.endsWith('_' + cible);
+    };
     const opsDuBucket = toutesOperations.filter(memeBucket);
     const stockDuBucket = toutStockage.filter(memeBucket);
     const bucketNonTrouve = (toutesOperations.length > 0 && opsDuBucket.length === 0) || (toutStockage.length > 0 && stockDuBucket.length === 0);
