@@ -76,9 +76,7 @@ Deno.serve(async (req: Request) => {
         .select('role')
         .eq('user_id', userData.user.id)
         .in('role', ['formateur', 'admin']);
-      if (!roleRows || roleRows.length === 0) {
-        throw new ErreurHttp('Non autorisé.', 403);
-      }
+      return { userId: userData.user.id, estFormateur: !!roleRows && roleRows.length > 0 };
     })();
 
     const reglagesPromise = supabaseAdmin
@@ -108,7 +106,7 @@ Deno.serve(async (req: Request) => {
       return usage;
     })();
 
-    const [, { data: reglages }, usage, body] = await Promise.all([
+    const [identite, { data: reglages }, usage, body] = await Promise.all([
       identitePromise,
       reglagesPromise,
       usagePromise,
@@ -123,6 +121,23 @@ Deno.serve(async (req: Request) => {
     const quotaGoParMois = valeurReglage('r2_quota_gb_uploaded_per_month', 9);
 
     const action = body.action ?? 'upload';
+
+    // Un arbitre (ni formateur ni admin) peut seulement LIRE un média, et uniquement celui
+    // d'un QCM dont il a démarré la tentative (le média est alors forcément présenté à lui).
+    if (!identite.estFormateur) {
+      if (action !== 'read' || !body.key) return json({ error: 'Non autorisé.' }, 403);
+      const { data: qs } = await supabaseAdmin.from('questions').select('quiz_id').eq('media_url', body.key);
+      const quizIds = (qs ?? []).map((q) => q.quiz_id);
+      const { data: tentative } = quizIds.length
+        ? await supabaseAdmin
+            .from('quiz_attempts')
+            .select('id')
+            .eq('user_id', identite.userId)
+            .in('quiz_id', quizIds)
+            .limit(1)
+        : { data: [] };
+      if (!tentative || tentative.length === 0) return json({ error: 'Non autorisé.' }, 403);
+    }
 
     const s3 = new S3Client({
       region: 'auto',
