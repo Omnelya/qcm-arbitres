@@ -184,7 +184,7 @@ export default function FormateurDashboard() {
     setError(null);
 
     const maintenant = new Date();
-    const dansUneSemaine = new Date(maintenant.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const dans5Jours = new Date(maintenant.getTime() + 5 * 24 * 60 * 60 * 1000);
 
     const { data, error } = await supabase
       .from('quizzes')
@@ -197,7 +197,7 @@ export default function FormateurDashboard() {
         show_correction: true,
         show_expected_count: true,
         period_start: maintenant.toISOString(),
-        period_end: dansUneSemaine.toISOString(),
+        period_end: dans5Jours.toISOString(),
       })
       .select('id')
       .single();
