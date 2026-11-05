@@ -184,7 +184,9 @@ export default function FormateurDashboard() {
     setError(null);
 
     const maintenant = new Date();
-    const dans5Jours = new Date(maintenant.getTime() + 5 * 24 * 60 * 60 * 1000);
+    // Durée choisie par le formateur dans « Mon profil » (5 jours si non réglée ou si le SQL n'est pas encore exécuté).
+    const { data: jours } = await supabase.rpc('ma_duree_periode');
+    const finPeriode = new Date(maintenant.getTime() + (Number(jours) || 5) * 24 * 60 * 60 * 1000);
 
     const { data, error } = await supabase
       .from('quizzes')
@@ -197,7 +199,7 @@ export default function FormateurDashboard() {
         show_correction: true,
         show_expected_count: true,
         period_start: maintenant.toISOString(),
-        period_end: dans5Jours.toISOString(),
+        period_end: finPeriode.toISOString(),
       })
       .select('id')
       .single();

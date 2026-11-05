@@ -1,9 +1,10 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AppLayout from '../components/AppLayout';
 import { supabase } from '../lib/supabaseClient';
 import { motDePasseValide, MESSAGE_REGLES_MOT_DE_PASSE } from '../lib/motDePasse';
 import ReglesMotDePasse from '../components/ReglesMotDePasse';
+import { useAuth } from '../hooks/useAuth';
 
 export default function MonProfil() {
   const [motDePasse, setMotDePasse] = useState('');
@@ -13,6 +14,35 @@ export default function MonProfil() {
   const [succes, setSucces] = useState(false);
 
   const navigate = useNavigate();
+
+  // Durée d'accessibilité par défaut des QCM (formateurs et administrateurs).
+  const { roles } = useAuth();
+  const peutRegler = roles.includes('formateur') || roles.includes('admin');
+  const [dureeJours, setDureeJours] = useState(5);
+  const [dureeEnCours, setDureeEnCours] = useState(false);
+  const [dureeMessage, setDureeMessage] = useState<{ ok: boolean; texte: string } | null>(null);
+  useEffect(() => {
+    if (!peutRegler) return;
+    supabase.rpc('ma_duree_periode').then(({ data }) => {
+      if (typeof data === 'number') setDureeJours(data);
+    });
+  }, [peutRegler]);
+  async function enregistrerDuree(e: FormEvent) {
+    e.preventDefault();
+    setDureeMessage(null);
+    if (!Number.isInteger(dureeJours) || dureeJours < 1 || dureeJours > 365) {
+      setDureeMessage({ ok: false, texte: 'Indiquez un nombre entier de jours entre 1 et 365.' });
+      return;
+    }
+    setDureeEnCours(true);
+    const { error } = await supabase.rpc('regler_ma_duree_periode', { p_jours: dureeJours });
+    setDureeEnCours(false);
+    setDureeMessage(
+      error
+        ? { ok: false, texte: error.code === 'PGRST202' ? "Cette fonction n'est pas encore activée sur le site. Réessayez plus tard." : "L'enregistrement a échoué. Réessayez dans un instant." }
+        : { ok: true, texte: 'Durée enregistrée.' }
+    );
+  }
   const [exportEnCours, setExportEnCours] = useState(false);
   const [erreurExport, setErreurExport] = useState<string | null>(null);
   const [suppressionOuverte, setSuppressionOuverte] = useState(false);
@@ -146,6 +176,41 @@ export default function MonProfil() {
           {enregistrement ? 'Enregistrement…' : 'Mettre à jour le mot de passe'}
         </button>
       </form>
+
+      {peutRegler && (
+        <>
+          <h2 className="text-sm font-semibold mt-8 mb-2">Période d'accessibilité par défaut de mes QCM</h2>
+          <form onSubmit={enregistrerDuree} className="bg-surface border border-border rounded p-4">
+            <p className="text-sm text-muted mb-3">
+              À la création ou à la duplication d'un QCM, il sera accessible à partir de maintenant pendant ce nombre de jours (vous
+              pouvez toujours modifier les dates ensuite).
+            </p>
+            <label className="block text-sm text-muted mb-1" htmlFor="duree-periode">
+              Nombre de jours
+            </label>
+            <input
+              id="duree-periode"
+              type="number"
+              min={1}
+              max={365}
+              value={dureeJours}
+              onChange={(e) => setDureeJours(Number(e.target.value))}
+              className="w-full border border-border rounded px-3 py-2 mb-3"
+            />
+            {dureeMessage && (
+              <p
+                role={dureeMessage.ok ? undefined : 'alert'}
+                className={'text-sm rounded px-3 py-2 mb-3 ' + (dureeMessage.ok ? 'text-pitch-dark bg-pitch-light' : 'text-card-red bg-card-red-bg')}
+              >
+                {dureeMessage.texte}
+              </p>
+            )}
+            <button type="submit" disabled={dureeEnCours} className="w-full bg-pitch text-white font-medium rounded py-2 disabled:opacity-60">
+              {dureeEnCours ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </form>
+        </>
+      )}
 
       <h2 className="text-sm font-semibold mt-8 mb-2">Mes données personnelles</h2>
       <div className="bg-surface border border-border rounded p-4 mb-4">
