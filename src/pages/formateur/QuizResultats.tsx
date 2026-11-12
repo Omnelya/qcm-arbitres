@@ -216,7 +216,14 @@ export default function QuizResultats() {
       const XLSX = module.default ?? module;
       const classeur = XLSX.utils.book_new();
 
-      const feuilleSynthese = XLSX.utils.json_to_sheet(donneesExport());
+      // Score en vrai pourcentage Excel (valeur 0,6667 affichée « 66,67% » selon la langue d'Excel)
+      const feuilleSynthese = XLSX.utils.json_to_sheet(
+        donneesExport().map((d, i) => ({ ...d, Score: lignes[i].score !== null ? lignes[i].score / 100 : '' }))
+      );
+      for (let r = 1; r <= lignes.length; r++) {
+        const cScore = feuilleSynthese[XLSX.utils.encode_cell({ r, c: 3 })];
+        if (cScore && cScore.t === 'n') cScore.z = '0.00%';
+      }
       XLSX.utils.book_append_sheet(classeur, feuilleSynthese, 'Résultats');
 
       const repondants = lignes.filter((l) => l.statut === 'soumis' && l.attemptId);
@@ -254,7 +261,7 @@ export default function QuizResultats() {
             const coches = aRepondu ? opts.filter((o) => cochees.has(`${l.attemptId}|${o.id}`)) : [];
             // même formule que la note du QCM : bonnes cochées / bonnes attendues, 0 si trop de cases cochées
             const bonnes = coches.filter((o) => o.is_correct).length;
-            const note = !aRepondu ? null : attendu === 0 || coches.length > attendu ? 0 : Math.round((bonnes / attendu) * 10000) / 100;
+            const note = !aRepondu ? null : attendu === 0 || coches.length > attendu ? 0 : Math.round((bonnes / attendu) * 10000) / 10000;
             lignesFeuille.push([l.full_name, ...opts.map((o) => (coches.includes(o) ? 'X' : '')), note]);
           }
           const feuille = XLSX.utils.aoa_to_sheet(lignesFeuille);
@@ -280,7 +287,7 @@ export default function QuizResultats() {
               if (cc) cc.s = { alignment: { vertical: 'center', horizontal: 'center' }, ...(opts[c - 1]?.is_correct ? { fill: fond } : {}) };
             }
             const cellule = feuille[XLSX.utils.encode_cell({ r, c: nbCol - 1 })];
-            if (cellule && cellule.t === 'n') cellule.z = '0.##" %"';
+            if (cellule && cellule.t === 'n') cellule.z = '0.00%';
           }
           // Excel limite les noms de feuille à 31 caractères et interdit : \ / ? * [ ]
           const nomFeuille = `Q${index + 1} - ${enonce.replace(/\s+/g, " ")}`.replace(/[:\\/?*[\]]/g, '').slice(0, 31);
