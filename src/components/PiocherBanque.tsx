@@ -18,6 +18,7 @@ interface LigneQuestion {
   numero: number | null;
   text: string;
   theme_id: string | null;
+  difficulte: string | null;
   deja_dans_qcm: boolean;
   options: { id: string; text: string; is_correct: boolean }[];
   total: number;
@@ -26,6 +27,7 @@ interface LigneQuestion {
 interface Memo {
   banqueId: string;
   filtreTheme: string;
+  filtreNiveau?: string;
   recherche: string;
   page: number;
   cochees: string[];
@@ -34,6 +36,15 @@ interface Memo {
 }
 
 const TAILLE_PAGE = 30;
+
+// Niveaux de difficulté (colonne banque_questions.difficulte)
+const NIVEAUX: [string, string][] = [
+  ['tres_facile', 'Très facile'],
+  ['facile', 'Facile'],
+  ['moyen', 'Moyen'],
+  ['difficile', 'Difficile'],
+];
+const NOM_NIVEAU: Record<string, string> = Object.fromEntries(NIVEAUX);
 
 // Fenêtre « Piocher dans la banque » (QCM en brouillon uniquement), ouverte depuis le
 // bouton « Ajouter une question » de la page. Les banques accessibles sont fournies par la page.
@@ -58,6 +69,7 @@ export default function PiocherBanque({
   const [banqueId, setBanqueId] = useState(memo?.banqueId ?? '');
   const [themes, setThemes] = useState<ThemeInfo[]>([]);
   const [filtreTheme, setFiltreTheme] = useState(memo?.filtreTheme ?? ''); // '' = tous, 'none' = sans thème, sinon id
+  const [filtreNiveau, setFiltreNiveau] = useState(memo?.filtreNiveau ?? ''); // '' = tous, 'aucune' = non classées, sinon niveau
   const [recherche, setRecherche] = useState(memo?.recherche ?? '');
   const [rechercheEffective, setRechercheEffective] = useState(memo?.recherche ?? '');
   const [page, setPage] = useState(memo?.page ?? 0);
@@ -85,13 +97,14 @@ export default function PiocherBanque({
     memoriser(cle, userId, {
       banqueId,
       filtreTheme,
+      filtreNiveau,
       recherche,
       page,
       cochees: [...cochees],
       nombreHasard,
       haut: hautCourant.current,
     } satisfies Memo);
-  }, [userId, cle, banqueId, filtreTheme, recherche, page, cochees, nombreHasard]);
+  }, [userId, cle, banqueId, filtreTheme, filtreNiveau, recherche, page, cochees, nombreHasard]);
 
   useEffect(() => {
     sauver();
@@ -125,6 +138,7 @@ export default function PiocherBanque({
       p_quiz: quizId,
       p_limite: TAILLE_PAGE,
       p_decalage: page * TAILLE_PAGE,
+      p_difficulte: filtreNiveau || null,
     });
     if (error) {
       setErreur('Impossible de charger les questions de la banque.');
@@ -133,7 +147,7 @@ export default function PiocherBanque({
     const l = (data ?? []) as LigneQuestion[];
     setLignes(l);
     setTotal(l[0]?.total ?? 0);
-  }, [ouvert, banqueId, filtreTheme, rechercheEffective, page, quizId]);
+  }, [ouvert, banqueId, filtreTheme, filtreNiveau, rechercheEffective, page, quizId]);
 
   useEffect(() => {
     chargerListe();
@@ -170,6 +184,7 @@ export default function PiocherBanque({
       p_banque: banqueId,
       p_theme: filtreTheme && filtreTheme !== 'none' ? filtreTheme : null,
       p_nombre: nombreHasard,
+      p_difficulte: filtreNiveau || null,
     });
     setOccupe(false);
     if (error) {
@@ -259,6 +274,23 @@ export default function PiocherBanque({
               ))}
               <option value="none">Sans thème</option>
             </select>
+            <select
+              value={filtreNiveau}
+              onChange={(e) => {
+                setFiltreNiveau(e.target.value);
+                setPage(0);
+              }}
+              aria-label="Difficulté"
+              className="border border-border rounded-xl px-3 py-2 text-sm bg-surface"
+            >
+              <option value="">Tous les niveaux</option>
+              {NIVEAUX.map(([v, nom]) => (
+                <option key={v} value={v}>
+                  {nom}
+                </option>
+              ))}
+              <option value="aucune">Non classées</option>
+            </select>
             <input
               type="search"
               value={recherche}
@@ -280,7 +312,10 @@ export default function PiocherBanque({
               aria-label="Nombre de questions à ajouter au hasard"
               className="w-20 border border-border rounded-lg px-2 py-1"
             />
-            <span>question(s) {filtreTheme && filtreTheme !== 'none' ? 'du thème choisi' : 'de la banque'}</span>
+            <span>
+              question(s) {filtreTheme && filtreTheme !== 'none' ? 'du thème choisi' : 'de la banque'}
+              {filtreNiveau && ` (${filtreNiveau === 'aucune' ? 'non classées' : (NOM_NIVEAU[filtreNiveau] ?? '').toLowerCase()})`}
+            </span>
             <button
               type="button"
               onClick={ajouterAuHasard}
@@ -333,6 +368,9 @@ export default function PiocherBanque({
                     <div className="flex-1 min-w-0">
                       <p className="text-sm whitespace-pre-line break-words">{l.text}</p>
                       <div className="flex items-center gap-3 mt-1">
+                        {l.difficulte && (
+                          <span className="text-xs text-muted bg-canvas border border-border rounded-full px-2 py-0.5">{NOM_NIVEAU[l.difficulte] ?? l.difficulte}</span>
+                        )}
                         <button
                           type="button"
                           onClick={() =>
